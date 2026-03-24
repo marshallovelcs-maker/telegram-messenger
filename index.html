@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Fembo Messenger</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="icon" type="image/png" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%234a9eff'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+</head>
+<body>
+    <div class="app">
+        <!-- Боковая панель -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <div class="fox-icon">🦊</div>
+                    <h2>Fembo</h2>
+                </div>
+                <button class="new-chat-btn" id="newChatBtn" title="Создать групповой чат">+</button>
+            </div>
+            
+            <div class="user-info">
+                <span id="currentNick">Загрузка...</span>
+                <button class="edit-nick-btn" id="editNickBtn">✎ Сменить ник</button>
+            </div>
+            
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Поиск по нику..." class="search-input">
+                <div id="searchResults" class="search-results"></div>
+            </div>
+            
+            <div class="online-users">
+                <h3>Онлайн пользователи</h3>
+                <div id="onlineUsersList" class="users-list">
+                    <div class="empty-message">Загрузка...</div>
+                </div>
+            </div>
+            
+            <div class="offline-users">
+                <h3>Оффлайн пользователи</h3>
+                <div id="offlineUsersList" class="users-list">
+                    <div class="empty-message">Загрузка...</div>
+                </div>
+            </div>
+            
+            <div class="chats-list">
+                <h3>Мои чаты</h3>
+                <div id="chatsList" class="chats-container">
+                    <div class="empty-message">Загрузка...</div>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Основная область чата -->
+        <main class="chat-area">
+            <div class="chat-header" id="chatHeader">
+                <h3>Выберите чат</h3>
+                <button class="delete-chat-btn" id="deleteChatBtn" style="display: none;">🗑 Удалить</button>
+            </div>
+            
+            <div class="messages-container" id="messagesContainer">
+                <div class="empty-chat-message">
+                    <p>🦊 Добро пожаловать в Fembo!</p>
+                    <p>Выберите чат из списка слева или создайте новый</p>
+                    <p>💡 Кликните по пользователю, чтобы начать личный диалог</p>
+                </div>
+            </div>
+            
+            <div class="message-input-container" style="display: none;">
+                <div class="input-actions">
+                    <label for="imageUpload" class="image-upload-btn" title="Отправить фото">📷</label>
+                    <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+                    <textarea id="messageInput" placeholder="Введите сообщение..." rows="3"></textarea>
+                    <button id="sendMessageBtn">Отправить</button>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Модальное окно смены ника -->
+    <div id="nickModal" class="modal">
+        <div class="modal-content">
+            <h3>Сменить ник</h3>
+            <input type="text" id="newNickInput" placeholder="Введите новый ник" autocomplete="off">
+            <div class="modal-buttons">
+                <button id="confirmNickBtn">Подтвердить</button>
+                <button id="cancelNickBtn">Отмена</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Модальное окно создания группового чата -->
+    <div id="newChatModal" class="modal">
+        <div class="modal-content">
+            <h3>Создать групповой чат</h3>
+            <input type="text" id="chatNameInput" placeholder="Название чата" autocomplete="off">
+            <div class="participants-select">
+                <h4>Выберите участников:</h4>
+                <div id="participantsList"></div>
+            </div>
+            <div class="modal-buttons">
+                <button id="createChatBtn">Создать чат</button>
+                <button id="cancelChatBtn">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app.js"></script>
+</body>
+</html>

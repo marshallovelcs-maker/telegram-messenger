@@ -176,7 +176,6 @@ io.on('connection', (socket) => {
     
     console.log(`✅ User online: ${nick} (${userData.id})`);
     console.log(`📊 Total users: ${allUsers.size}, Online: ${users.size}`);
-    console.log(`📨 Unread messages for ${nick}:`, Array.from(userUnreads.entries()));
   });
   
   socket.on('create_private_chat', (chatName, targetUserId) => {
@@ -379,7 +378,6 @@ io.on('connection', (socket) => {
         }
       });
       chats.delete(chatId);
-      // Удаляем счетчики непрочитанных для этого чата
       if (userUnreadCounts.has(user.id)) {
         userUnreadCounts.get(user.id).delete(chatId);
       }
@@ -388,6 +386,7 @@ io.on('connection', (socket) => {
     }
   });
   
+  // Обработчик текстовых сообщений
   socket.on('send_message', (data) => {
     const { chatId, message } = data;
     const user = users.get(socket.id);
@@ -396,6 +395,7 @@ io.on('connection', (socket) => {
     if (user && chat && message && message.trim()) {
       const messageObj = {
         id: Date.now().toString(),
+        type: 'text',
         text: message.trim(),
         sender: user.nick,
         senderId: user.id,
@@ -409,19 +409,55 @@ io.on('connection', (socket) => {
         const participantSocket = io.sockets.sockets.get(participantId);
         
         if (participantSocket) {
-          // Если участник онлайн, отправляем сообщение сразу
           participantSocket.emit('new_message', {
             chatId: chatId,
             message: messageObj
           });
         } else {
-          // Если участник оффлайн, добавляем в непрочитанные
           addUnreadMessage(participantId, chatId);
-          console.log(`📨 Added unread message for offline user ${participantId} in chat ${chatId}`);
         }
       });
       
       console.log(`💬 ${chat.name}: ${user.nick}: ${message.substring(0, 50)}`);
+    }
+  });
+  
+  // Обработчик отправки фото
+  socket.on('send_image', (data) => {
+    const { chatId, image } = data;
+    const user = users.get(socket.id);
+    const chat = chats.get(chatId);
+    
+    if (user && chat && image) {
+      const imageObj = {
+        id: Date.now().toString(),
+        type: 'image',
+        image: image,
+        sender: user.nick,
+        senderId: user.id,
+        timestamp: new Date().toISOString()
+      };
+      
+      chat.messages.push(imageObj);
+      
+      // Отправляем фото всем участникам чата
+      chat.participants.forEach(participantId => {
+        const participantSocket = io.sockets.sockets.get(participantId);
+        
+        if (participantSocket) {
+          participantSocket.emit('new_image', {
+            chatId: chatId,
+            image: image,
+            sender: user.nick,
+            senderId: user.id,
+            timestamp: imageObj.timestamp
+          });
+        } else {
+          addUnreadMessage(participantId, chatId);
+        }
+      });
+      
+      console.log(`🖼️ Image in ${chat.name} from ${user.nick}`);
     }
   });
   
