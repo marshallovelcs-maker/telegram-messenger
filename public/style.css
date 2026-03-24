@@ -45,8 +45,8 @@ body {
     background: #2a2a2a;
     border: none;
     color: #e0e0e0;
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border-radius: 0;
     font-size: 20px;
     cursor: pointer;
@@ -54,7 +54,8 @@ body {
 }
 
 .new-chat-btn:hover {
-    background: #3a3a3a;
+    background: #4a9eff;
+    color: white;
 }
 
 .user-info {
@@ -70,13 +71,15 @@ body {
     font-size: 14px;
     font-weight: 500;
     color: #4a9eff;
+    word-break: break-word;
+    max-width: 180px;
 }
 
 .edit-nick-btn {
     background: #2a2a2a;
     border: none;
     color: #e0e0e0;
-    padding: 5px 10px;
+    padding: 5px 12px;
     cursor: pointer;
     font-size: 12px;
     transition: background 0.2s;
@@ -99,6 +102,7 @@ body {
     border: 1px solid #2a2a2a;
     color: #e0e0e0;
     font-size: 14px;
+    border-radius: 0;
 }
 
 .search-input:focus {
@@ -125,9 +129,10 @@ body {
 }
 
 .search-result-item {
-    padding: 8px 12px;
+    padding: 10px 12px;
     cursor: pointer;
     transition: background 0.2s;
+    border-bottom: 1px solid #2a2a2a;
 }
 
 .search-result-item:hover {
@@ -144,19 +149,28 @@ body {
     text-transform: uppercase;
     color: #888;
     margin-bottom: 10px;
+    letter-spacing: 0.5px;
 }
 
 .users-list {
-    max-height: 150px;
+    max-height: 200px;
     overflow-y: auto;
 }
 
 .user-item {
-    padding: 6px 0;
+    padding: 8px 0;
     font-size: 13px;
     color: #e0e0e0;
     display: flex;
     align-items: center;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-radius: 0;
+}
+
+.user-item:hover {
+    background: #1a1a1a;
+    padding-left: 8px;
 }
 
 .user-item::before {
@@ -164,6 +178,13 @@ body {
     color: #4caf50;
     margin-right: 8px;
     font-size: 10px;
+}
+
+.empty-message {
+    color: #666;
+    font-size: 12px;
+    text-align: center;
+    padding: 20px;
 }
 
 .chats-list {
@@ -177,12 +198,13 @@ body {
     text-transform: uppercase;
     color: #888;
     margin-bottom: 10px;
+    letter-spacing: 0.5px;
 }
 
 .chats-container {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 2px;
 }
 
 .chat-item {
@@ -205,6 +227,8 @@ body {
 .chat-name {
     font-weight: 500;
     margin-bottom: 4px;
+    font-size: 14px;
+    color: #e0e0e0;
 }
 
 .chat-preview {
@@ -232,6 +256,7 @@ body {
 .chat-header h3 {
     font-size: 18px;
     font-weight: 500;
+    color: #e0e0e0;
 }
 
 .delete-chat-btn {
@@ -263,6 +288,10 @@ body {
     margin-top: 50px;
 }
 
+.empty-chat-message p {
+    margin: 10px 0;
+}
+
 .message {
     display: flex;
     flex-direction: column;
@@ -281,6 +310,7 @@ body {
     font-size: 12px;
     margin-bottom: 4px;
     color: #888;
+    font-weight: 500;
 }
 
 .message.own .message-header {
@@ -292,6 +322,7 @@ body {
     background: #1a1a1a;
     word-wrap: break-word;
     line-height: 1.4;
+    border-radius: 0;
 }
 
 .message.own .message-content {
@@ -324,6 +355,8 @@ body {
     color: #e0e0e0;
     font-family: inherit;
     resize: none;
+    border-radius: 0;
+    font-size: 14px;
 }
 
 #messageInput:focus {
@@ -338,10 +371,12 @@ body {
     color: #e0e0e0;
     cursor: pointer;
     transition: background 0.2s;
+    font-size: 14px;
 }
 
 #sendMessageBtn:hover {
-    background: #3a3a3a;
+    background: #4a9eff;
+    color: white;
 }
 
 /* Modal styles */
@@ -352,7 +387,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.9);
     z-index: 2000;
     justify-content: center;
     align-items: center;
@@ -366,11 +401,19 @@ body {
     background: #0f0f0f;
     border: 1px solid #2a2a2a;
     padding: 30px;
-    min-width: 300px;
+    min-width: 350px;
+    max-width: 90%;
 }
 
 .modal-content h3 {
     margin-bottom: 20px;
+    color: #e0e0e0;
+}
+
+.modal-content h4 {
+    margin: 15px 0 10px 0;
+    color: #888;
+    font-size: 14px;
 }
 
 .modal-content input {
@@ -380,25 +423,45 @@ body {
     background: #1a1a1a;
     border: 1px solid #2a2a2a;
     color: #e0e0e0;
+    border-radius: 0;
+    font-size: 14px;
+}
+
+.modal-content input:focus {
+    outline: none;
+    border-color: #4a9eff;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
 }
 
 .modal-content button {
     padding: 8px 16px;
-    margin-right: 10px;
     background: #2a2a2a;
     border: none;
     color: #e0e0e0;
     cursor: pointer;
+    transition: background 0.2s;
+    font-size: 14px;
 }
 
 .modal-content button:hover {
     background: #3a3a3a;
 }
 
+.modal-content button:first-child:hover {
+    background: #4a9eff;
+}
+
 .participants-select {
     margin: 15px 0;
-    max-height: 200px;
+    max-height: 250px;
     overflow-y: auto;
+    border: 1px solid #2a2a2a;
+    padding: 10px;
 }
 
 .participant-checkbox {
@@ -411,6 +474,12 @@ body {
     width: auto;
     margin-right: 8px;
     margin-bottom: 0;
+    cursor: pointer;
+}
+
+.participant-checkbox label {
+    cursor: pointer;
+    font-size: 14px;
 }
 
 /* Scrollbar styles */
