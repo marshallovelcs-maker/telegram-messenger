@@ -28,7 +28,6 @@ const messageInputContainer = document.querySelector('.message-input-container')
 const messageInput = document.getElementById('messageInput');
 const sendMessageBtn = document.getElementById('sendMessageBtn');
 const deleteChatBtn = document.getElementById('deleteChatBtn');
-const imageUpload = document.getElementById('imageUpload');
 
 // Modals
 const nickModal = document.getElementById('nickModal');
@@ -40,11 +39,6 @@ const chatNameInput = document.getElementById('chatNameInput');
 const participantsList = document.getElementById('participantsList');
 const createChatBtn = document.getElementById('createChatBtn');
 const cancelChatBtn = document.getElementById('cancelChatBtn');
-
-// Mobile elements
-const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-const mobileBackBtn = document.getElementById('mobileBackBtn');
-const sidebar = document.getElementById('sidebar');
 
 // localStorage functions
 function saveUserNick(nick) {
@@ -92,6 +86,7 @@ socket.on('initial_data', (data) => {
     if (data.chats && data.chats.length > 0) {
         data.chats.forEach(chat => {
             chats.set(chat.id, chat);
+            // Сохраняем счетчик непрочитанных сообщений
             const unreadCount = chat.unreadCount || 0;
             unreadMessages.set(chat.id, unreadCount);
             console.log(`Chat ${chat.name}: ${unreadCount} unread messages`);
@@ -117,6 +112,7 @@ socket.on('initial_data', (data) => {
     }
     if (totalUnread > 0) {
         console.log(`📨 You have ${totalUnread} unread messages`);
+        // Можем показать всплывающее уведомление
         if (Notification.permission === 'granted') {
             new Notification(`Fembo`, {
                 body: `У вас ${totalUnread} непрочитанных сообщений`,
@@ -286,11 +282,6 @@ socket.on('chat_deleted', (chatId) => {
         deleteChatBtn.style.display = 'none';
         messageInputContainer.style.display = 'none';
         messagesContainer.innerHTML = '<div class="empty-chat-message"><p>Выберите чат для начала общения</p></div>';
-        
-        // Скрываем кнопку назад на мобильных
-        if (window.innerWidth <= 768 && mobileBackBtn) {
-            mobileBackBtn.style.display = 'none';
-        }
     }
     renderChatsList();
 });
@@ -302,20 +293,25 @@ socket.on('new_message', (data) => {
     if (chat) {
         chat.messages.push(data.message);
         
+        // Если сообщение не от текущего пользователя и чат не открыт
         if (data.message.sender !== currentUser.nick && 
             (!currentChat || currentChat.id !== data.chatId)) {
             const currentCount = unreadMessages.get(data.chatId) || 0;
             unreadMessages.set(data.chatId, currentCount + 1);
             renderChatsList();
             playNotificationSound();
+            
+            // Обновляем заголовок страницы
             updatePageTitle();
         }
         
+        // Если чат открыт, показываем сообщение сразу и сбрасываем счетчик
         if (currentChat && currentChat.id === data.chatId) {
             renderMessages(chat);
             scrollToBottom();
             unreadMessages.set(data.chatId, 0);
             renderChatsList();
+            // Отправляем на сервер, что сообщения прочитаны
             socket.emit('mark_read', data.chatId);
         }
     }
@@ -324,6 +320,7 @@ socket.on('new_message', (data) => {
 function createPrivateChat(user) {
     if (!user || !user.id) return;
     
+    // Проверяем, существует ли уже личный чат
     let existingChat = null;
     for (let [chatId, chat] of chats) {
         if (chat.isPrivate && chat.participants && chat.participants.length === 2) {
@@ -509,6 +506,7 @@ function openChat(chatId) {
         renderMessages(chat);
         scrollToBottom();
         
+        // Сбрасываем счетчик непрочитанных при открытии чата
         if (unreadMessages.get(chatId) > 0) {
             unreadMessages.set(chatId, 0);
             socket.emit('mark_read', chatId);
@@ -518,26 +516,12 @@ function openChat(chatId) {
         
         newChats.delete(chatId);
         renderChatsList();
-        
-        // Показываем кнопку назад на мобильных
-        if (window.innerWidth <= 768 && mobileBackBtn) {
-            mobileBackBtn.style.display = 'flex';
-        }
     }
 }
 
 function renderMessages(chat) {
     if (!messagesContainer) return;
     messagesContainer.innerHTML = '';
-    
-    if (!chat.messages || chat.messages.length === 0) {
-        const emptyDiv = document.createElement('div');
-        emptyDiv.className = 'empty-chat-message';
-        emptyDiv.innerHTML = '<p>Нет сообщений. Напишите что-нибудь!</p>';
-        messagesContainer.appendChild(emptyDiv);
-        return;
-    }
-    
     chat.messages.forEach(msg => {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${msg.sender === currentUser.nick ? 'own' : 'other'}`;
@@ -570,7 +554,6 @@ function scrollToBottom() {
 }
 
 function escapeHtml(text) {
-    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
@@ -584,80 +567,9 @@ function updatePageTitle() {
     document.title = totalUnread > 0 ? `(${totalUnread}) Fembo` : 'Fembo 🦊';
 }
 
-// Мобильные функции
-function closeMobileMenu() {
-    if (sidebar) {
-        sidebar.classList.remove('open');
-    }
-}
-
-function openMobileMenu() {
-    if (sidebar) {
-        sidebar.classList.add('open');
-    }
-}
-
-// Обработчик кнопки меню
-if (mobileMenuBtn) {
-    mobileMenuBtn.onclick = (e) => {
-        e.stopPropagation();
-        if (sidebar && sidebar.classList.contains('open')) {
-            closeMobileMenu();
-        } else {
-            openMobileMenu();
-        }
-    };
-}
-
-// Обработчик кнопки назад
-if (mobileBackBtn) {
-    mobileBackBtn.onclick = () => {
-        // Закрываем чат и показываем список чатов
-        currentChat = null;
-        const chatHeaderH3 = chatHeader.querySelector('h3');
-        if (chatHeaderH3) chatHeaderH3.textContent = 'Выберите чат';
-        deleteChatBtn.style.display = 'none';
-        messageInputContainer.style.display = 'none';
-        messagesContainer.innerHTML = '<div class="empty-chat-message"><p>Выберите чат для начала общения</p></div>';
-        
-        closeMobileMenu();
-        mobileBackBtn.style.display = 'none';
-        renderChatsList();
-    };
-}
-
-// При клике вне меню закрываем его
-document.addEventListener('click', (e) => {
-    if (window.innerWidth <= 768 && sidebar && sidebar.classList.contains('open')) {
-        if (mobileMenuBtn && !mobileMenuBtn.contains(e.target) && !sidebar.contains(e.target)) {
-            closeMobileMenu();
-        }
-    }
-});
-
-// При изменении размера окна
-window.addEventListener('resize', () => {
-    if (window.innerWidth > 768) {
-        if (sidebar) sidebar.classList.remove('open');
-        if (mobileBackBtn) mobileBackBtn.style.display = 'none';
-    } else if (currentChat && mobileBackBtn) {
-        mobileBackBtn.style.display = 'flex';
-    }
-});
-
 setInterval(updatePageTitle, 1000);
 
 // Event listeners
-if (imageUpload) {
-    imageUpload.onchange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            // Функция отправки изображения (заглушка, без отправки)
-            alert('Отправка изображений временно отключена');
-            imageUpload.value = '';
-        }
-    };
-}
-
 if (editNickBtn) {
     editNickBtn.onclick = () => {
         newNickInput.value = currentUser.nick;
@@ -772,4 +684,4 @@ document.addEventListener('click', (e) => {
     }
 });
 
-console.log('🦊 Fembo Messenger ready with mobile support');
+console.log('🦊 Fembo Messenger ready');
