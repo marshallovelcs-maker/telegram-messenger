@@ -19,20 +19,25 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Хранилище данных
-let users = new Map(); // socketId -> { id, nick, chats, online, lastSeen }
-let allUsers = new Map(); // id -> { id, nick, online, lastSeen, chats }
-let chats = new Map(); // chatId -> { id, name, participants, messages, isPrivate, createdAt }
+let users = new Map(); // socketId -> user object
+let allUsers = new Map(); // userId -> user object (сохраняем всех пользователей)
+let chats = new Map(); // chatId -> chat object
 
-// Создание тестового чата
-const testChatId = Date.now().toString();
-chats.set(testChatId, {
-  id: testChatId,
-  name: 'Общий чат',
-  participants: [],
-  messages: [],
-  isPrivate: false,
-  createdAt: new Date()
-});
+// ID общего чата (фиксированный)
+const GENERAL_CHAT_ID = 'general_chat';
+
+// Создание общего чата, если его нет
+if (!chats.has(GENERAL_CHAT_ID)) {
+  chats.set(GENERAL_CHAT_ID, {
+    id: GENERAL_CHAT_ID,
+    name: 'Общий чат',
+    participants: [],
+    messages: [],
+    isPrivate: false,
+    createdAt: new Date()
+  });
+  console.log('General chat created');
+}
 
 // Middleware для логирования
 app.use((req, res, next) => {
@@ -42,88 +47,105 @@ app.use((req, res, next) => {
 
 // Socket.IO обработчики
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
+  console.log(`New connection: ${socket.id}`);
   
   socket.on('register', (nick) => {
-    // Проверяем, существует ли пользователь с таким ником и онлайн
-    let existingUser = null;
-    for (let [id, user] of allUsers) {
-      if (user.nick === nick && user.online === true) {
-        existingUser = user;
+    console.log(`Registering user: ${nick}`);
+    
+    // Проверяем, есть ли уже пользователь с таким ником онлайн
+    let existingOnline = false;
+    for (let [id, user] of users) {
+      if (user.nick === nick) {
+        existingOnline = true;
         break;
       }
     }
     
-    if (existingUser) {
+    if (existingOnline) {
       socket.emit('registration_error', 'Ник уже занят');
       return;
     }
     
-    // Проверяем, был ли пользователь зарегистрирован ранее (оффлайн)
+    // Ищем пользователя в базе всех пользователей
     let userData = null;
     for (let [id, user] of allUsers) {
       if (user.nick === nick) {
         userData = user;
-        userData.online = true;
-        userData.lastSeen = new Date();
-        userData.socketId = socket.id;
-        allUsers.set(id, userData);
         break;
       }
     }
     
-    // Если новый пользователь
+    // Если пользователь новый
     if (!userData) {
       userData = {
         id: socket.id,
         nick: nick,
-        chats: [testChatId],
+        chats: [GENERAL_CHAT_ID], // Добавляем общий чат
         online: true,
         lastSeen: new Date()
       };
       allUsers.set(socket.id, userData);
+    } else {
+      // Пользователь уже был, обновляем данные
+      userData.online = true;
+      userData.lastSeen = new Date();
+      userData.socketId = socket.id;
+      // Убеждаемся, что общий чат есть в списке
+      if (!userData.chats.includes(GENERAL_CHAT_ID)) {
+        userData.chats.push(GENERAL_CHAT_ID);
+      }
+      allUsers.set(userData.id, userData);
     }
     
+    // Сохраняем в активные пользователи
     users.set(socket.id, userData);
     
-    // Добавляем в общий чат
-    socket.join(testChatId);
-    const testChat = chats.get(testChatId);
-    if (testChat && !testChat.participants.includes(socket.id)) {
-      testChat.participants.push(socket.id);
+    // Добавляем пользователя в общий чат
+    const generalChat = chats.get(GENERAL_CHAT_ID);
+    if (generalChat && !generalChat.participants.includes(userData.id)) {
+      generalChat.participants.push(userData.id);
+    }
+    socket.join(GENERAL_CHAT_ID);
+    
+    // Формируем список чатов пользователя
+    const userChats = [];
+    for (let chatId of userData.chats) {
+      const chat = chats.get(chatId);
+      if (chat) {
+        userChats.push({
+          id: chat.id,
+          name: chat.name,
+          messages: chat.messages,
+          isPrivate: chat.isPrivate,
+          participants: chat.participants
+        });
+      }
     }
     
-    // Если у пользователя нет чатов в списке (восстановление)
-    if (!userData.chats) {
-      userData.chats = [testChatId];
+    // Формируем список всех пользователей
+    const allUsersList = [];
+    for (let [id, user] of allUsers) {
+      allUsersList.push({
+        id: user.id,
+        nick: user.nick,
+        online: user.online,
+        lastSeen: user.lastSeen
+      });
     }
-    
-    const userChats = Array.from(chats.entries())
-      .filter(([chatId]) => userData.chats.includes(chatId))
-      .map(([chatId, chat]) => ({
-        id: chatId,
-        name: chat.name,
-        messages: chat.messages,
-        isPrivate: chat.isPrivate,
-        participants: chat.participants
-      }));
     
     // Отправляем начальные данные
     socket.emit('initial_data', {
       user: { nick: nick, id: userData.id },
       chats: userChats,
-      allUsers: Array.from(allUsers.values()).map(u => ({ 
-        nick: u.nick, 
-        id: u.id, 
-        online: u.online,
-        lastSeen: u.lastSeen 
-      }))
+      allUsers: allUsersList
     });
     
     // Уведомляем всех о новом/вернувшемся пользователе
     io.emit('user_online', { nick: nick, id: userData.id });
-    console.log(`User registered/online: ${nick} (${userData.id})`);
-    console.log(`Total users: ${allUsers.size}, Online: ${Array.from(allUsers.values()).filter(u => u.online).length}`);
+    
+    console.log(`✅ User registered: ${nick} (${userData.id})`);
+    console.log(`📊 Total users: ${allUsers.size}, Online: ${users.size}`);
+    console.log(`💬 Chats: ${chats.size}, General chat participants: ${generalChat.participants.length}`);
   });
   
   socket.on('create_private_chat', (chatName, targetUserId) => {
@@ -131,11 +153,11 @@ io.on('connection', (socket) => {
     const targetUser = allUsers.get(targetUserId);
     
     if (!creator || !targetUser) {
-      console.log(`Cannot create private chat: creator or target not found`);
+      console.log(`❌ Cannot create private chat: creator or target not found`);
       return;
     }
     
-    // Проверяем, не существует ли уже такой чат
+    // Проверяем, существует ли уже личный чат
     let existingChat = null;
     for (let [chatId, chat] of chats) {
       if (chat.isPrivate && chat.participants && chat.participants.length === 2) {
@@ -176,7 +198,7 @@ io.on('connection', (socket) => {
       participants: [creator.id, targetUser.id]
     });
     
-    // Отправляем целевому пользователю (даже если оффлайн)
+    // Отправляем целевому пользователю
     const targetSocket = io.sockets.sockets.get(targetUser.id);
     if (targetSocket) {
       targetSocket.emit('new_chat', {
@@ -191,7 +213,8 @@ io.on('connection', (socket) => {
     
     socket.join(chatId);
     socket.emit('chat_created', { id: chatId, name: chatName, isPrivate: true });
-    console.log(`Private chat created: ${chatName} between ${creator.nick} and ${targetUser.nick}`);
+    
+    console.log(`💬 Private chat created: ${chatName} between ${creator.nick} and ${targetUser.nick}`);
   });
   
   socket.on('create_group_chat', (chatName, participantNicks) => {
@@ -202,9 +225,11 @@ io.on('connection', (socket) => {
     const participants = [creator.id];
     
     participantNicks.forEach(nick => {
-      const user = Array.from(allUsers.values()).find(u => u.nick === nick);
-      if (user && !participants.includes(user.id)) {
-        participants.push(user.id);
+      for (let [id, user] of allUsers) {
+        if (user.nick === nick && !participants.includes(id)) {
+          participants.push(id);
+          break;
+        }
       }
     });
     
@@ -220,7 +245,6 @@ io.on('connection', (socket) => {
     participants.forEach(participantId => {
       const user = allUsers.get(participantId);
       if (user) {
-        if (!user.chats) user.chats = [];
         user.chats.push(chatId);
         const participantSocket = io.sockets.sockets.get(participantId);
         if (participantSocket) {
@@ -239,7 +263,8 @@ io.on('connection', (socket) => {
     chats.set(chatId, newChat);
     socket.join(chatId);
     socket.emit('chat_created', { id: chatId, name: chatName, isPrivate: false });
-    console.log(`Group chat created: ${chatName} with ${participants.length} participants`);
+    
+    console.log(`👥 Group chat created: ${chatName} with ${participants.length} participants`);
   });
   
   socket.on('change_nick', (newNick) => {
@@ -267,13 +292,17 @@ io.on('connection', (socket) => {
     
     io.emit('nick_changed', { oldNick: oldNick, newNick: newNick, id: user.id });
     socket.emit('nick_changed_success', { newNick: newNick });
-    console.log(`${oldNick} changed nick to ${newNick}`);
+    
+    console.log(`✏️ ${oldNick} changed nick to ${newNick}`);
   });
   
   socket.on('search_users', (query) => {
-    const searchResults = Array.from(allUsers.values())
-      .filter(user => user.nick.toLowerCase().includes(query.toLowerCase()) && user.id !== socket.id)
-      .map(user => ({ nick: user.nick, id: user.id }));
+    const searchResults = [];
+    for (let [id, user] of allUsers) {
+      if (user.nick.toLowerCase().includes(query.toLowerCase()) && user.id !== socket.id) {
+        searchResults.push({ nick: user.nick, id: user.id });
+      }
+    }
     socket.emit('search_results', searchResults);
   });
   
@@ -293,6 +322,8 @@ io.on('connection', (socket) => {
         participants: chat.participants
       });
       io.to(chatId).emit('user_joined', { nick: user.nick, chatId: chatId });
+      
+      console.log(`➕ ${user.nick} joined chat: ${chat.name}`);
     }
   });
   
@@ -300,7 +331,7 @@ io.on('connection', (socket) => {
     const user = users.get(socket.id);
     const chat = chats.get(chatId);
     
-    if (chat && user) {
+    if (chat && user && chatId !== GENERAL_CHAT_ID) { // Нельзя удалить общий чат
       chat.participants.forEach(participantId => {
         const participant = allUsers.get(participantId);
         if (participant && participant.chats) {
@@ -314,7 +345,9 @@ io.on('connection', (socket) => {
       });
       chats.delete(chatId);
       socket.emit('chat_deleted_success', chatId);
-      console.log(`Chat deleted: ${chat.name}`);
+      console.log(`🗑️ Chat deleted: ${chat.name}`);
+    } else if (chatId === GENERAL_CHAT_ID) {
+      socket.emit('error', 'Нельзя удалить общий чат');
     }
   });
   
@@ -345,7 +378,7 @@ io.on('connection', (socket) => {
         }
       });
       
-      console.log(`Message in ${chat.name} from ${user.nick}: ${message.substring(0, 50)}`);
+      console.log(`💬 Message in ${chat.name} from ${user.nick}: ${message.substring(0, 50)}`);
     }
   });
   
@@ -358,8 +391,8 @@ io.on('connection', (socket) => {
       users.delete(socket.id);
       
       io.emit('user_offline', { nick: user.nick, id: user.id });
-      console.log(`User disconnected: ${user.nick}`);
-      console.log(`Total users: ${allUsers.size}, Online: ${Array.from(allUsers.values()).filter(u => u.online).length}`);
+      console.log(`❌ User disconnected: ${user.nick}`);
+      console.log(`📊 Total users: ${allUsers.size}, Online: ${users.size}`);
     }
   });
 });
@@ -371,9 +404,10 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`=================================`);
-  console.log(`Fembo Messenger Server Started 🦊`);
+  console.log(`🦊 Fembo Messenger Server Started`);
   console.log(`=================================`);
-  console.log(`Port: ${PORT}`);
-  console.log(`URL: http://localhost:${PORT}`);
+  console.log(`📡 Port: ${PORT}`);
+  console.log(`🌐 URL: http://localhost:${PORT}`);
+  console.log(`💬 General chat ID: ${GENERAL_CHAT_ID}`);
   console.log(`=================================`);
 });

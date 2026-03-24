@@ -67,30 +67,45 @@ if (userNick) {
 
 // Socket event handlers
 socket.on('initial_data', (data) => {
+    console.log('📦 Initial data received:', data);
+    
     currentUser = data.user;
     currentNickSpan.textContent = data.user.nick;
     
-    data.chats.forEach(chat => {
-        chats.set(chat.id, chat);
-        if (!unreadMessages.has(chat.id)) {
-            unreadMessages.set(chat.id, 0);
-        }
-    });
+    // Очищаем старые данные
+    chats.clear();
+    allUsers.clear();
+    unreadMessages.clear();
+    newChats.clear();
     
-    // Сохраняем всех пользователей
-    data.allUsers.forEach(user => {
-        allUsers.set(user.id, user);
-    });
+    // Загружаем чаты
+    if (data.chats && data.chats.length > 0) {
+        data.chats.forEach(chat => {
+            chats.set(chat.id, chat);
+            if (!unreadMessages.has(chat.id)) {
+                unreadMessages.set(chat.id, 0);
+            }
+        });
+        console.log(`✅ Loaded ${chats.size} chats`);
+    } else {
+        console.log('⚠️ No chats received');
+    }
+    
+    // Загружаем всех пользователей
+    if (data.allUsers && data.allUsers.length > 0) {
+        data.allUsers.forEach(user => {
+            allUsers.set(user.id, user);
+        });
+        console.log(`✅ Loaded ${allUsers.size} users`);
+        console.log(`📊 Online users: ${Array.from(allUsers.values()).filter(u => u.online).length}`);
+    } else {
+        console.log('⚠️ No users received');
+    }
     
     updateUsersLists();
     renderChatsList();
     
-    console.log('Initial data loaded:', {
-        currentUser: currentUser,
-        totalUsers: allUsers.size,
-        onlineUsers: Array.from(allUsers.values()).filter(u => u.online).length,
-        chats: chats.size
-    });
+    console.log('🎉 Fembo Messenger ready!');
 });
 
 socket.on('registration_error', (error) => {
@@ -104,6 +119,7 @@ socket.on('registration_error', (error) => {
 });
 
 socket.on('user_online', (user) => {
+    console.log(`🟢 User online: ${user.nick}`);
     const existingUser = allUsers.get(user.id);
     if (existingUser) {
         existingUser.online = true;
@@ -120,6 +136,7 @@ socket.on('user_online', (user) => {
 });
 
 socket.on('user_offline', (user) => {
+    console.log(`🔴 User offline: ${user.nick}`);
     const existingUser = allUsers.get(user.id);
     if (existingUser) {
         existingUser.online = false;
@@ -134,6 +151,7 @@ socket.on('user_offline', (user) => {
 });
 
 socket.on('nick_changed', (data) => {
+    console.log(`✏️ Nick changed: ${data.oldNick} -> ${data.newNick}`);
     if (currentUser && data.id === currentUser.id) {
         currentUser.nick = data.newNick;
         currentNickSpan.textContent = data.newNick;
@@ -172,6 +190,7 @@ socket.on('nick_changed_success', (data) => {
     currentUser.nick = data.newNick;
     currentNickSpan.textContent = data.newNick;
     saveUserNick(data.newNick);
+    console.log(`✅ Nick changed successfully to: ${data.newNick}`);
 });
 
 socket.on('nick_error', (error) => {
@@ -199,7 +218,7 @@ socket.on('search_results', (results) => {
 });
 
 socket.on('new_chat', (chat) => {
-    console.log('New chat received:', chat);
+    console.log('💬 New chat received:', chat);
     chats.set(chat.id, chat);
     unreadMessages.set(chat.id, 0);
     newChats.add(chat.id);
@@ -208,23 +227,31 @@ socket.on('new_chat', (chat) => {
 });
 
 socket.on('chat_created', (chat) => {
-    console.log('Chat created:', chat);
+    console.log('✅ Chat created:', chat);
     newChatModal.classList.remove('active');
 });
 
+socket.on('chat_exists', (chat) => {
+    console.log('⚠️ Chat already exists:', chat);
+    openChat(chat.id);
+});
+
 socket.on('joined_chat', (chat) => {
+    console.log('➕ Joined chat:', chat);
     chats.set(chat.id, chat);
     renderChatsList();
     openChat(chat.id);
 });
 
 socket.on('user_joined', (data) => {
+    console.log(`👤 ${data.nick} joined chat: ${data.chatId}`);
     if (currentChat && currentChat.id === data.chatId) {
         addSystemMessage(`Пользователь ${data.nick} присоединился к чату`);
     }
 });
 
 socket.on('chat_deleted', (chatId) => {
+    console.log(`🗑️ Chat deleted: ${chatId}`);
     chats.delete(chatId);
     unreadMessages.delete(chatId);
     newChats.delete(chatId);
@@ -240,9 +267,12 @@ socket.on('chat_deleted', (chatId) => {
     renderChatsList();
 });
 
-socket.on('chat_deleted_success', (chatId) => {});
+socket.on('chat_deleted_success', (chatId) => {
+    console.log(`✅ Chat deleted successfully: ${chatId}`);
+});
 
 socket.on('new_message', (data) => {
+    console.log(`💬 New message in chat ${data.chatId}: ${data.message.text.substring(0, 30)}`);
     const chat = chats.get(data.chatId);
     if (chat) {
         chat.messages.push(data.message);
@@ -266,9 +296,11 @@ socket.on('new_message', (data) => {
 
 function createPrivateChat(user) {
     if (!user || !user.id) {
-        console.error('Invalid user data:', user);
+        console.error('❌ Invalid user data:', user);
         return;
     }
+    
+    console.log(`💬 Creating private chat with: ${user.nick} (${user.id})`);
     
     let existingChat = null;
     for (let [chatId, chat] of chats) {
@@ -281,6 +313,7 @@ function createPrivateChat(user) {
     }
     
     if (existingChat) {
+        console.log(`✅ Using existing chat: ${existingChat.name}`);
         openChat(existingChat.id);
     } else {
         const chatName = `Личный чат с ${user.nick}`;
@@ -301,6 +334,7 @@ function createGroupChat() {
         selectedParticipants.push(cb.value);
     });
     
+    console.log(`👥 Creating group chat: ${chatName} with ${selectedParticipants}`);
     socket.emit('create_group_chat', chatName, selectedParticipants);
     newChatModal.classList.remove('active');
     chatNameInput.value = '';
@@ -521,7 +555,7 @@ function updatePageTitle() {
     if (totalUnread > 0) {
         document.title = `(${totalUnread}) Fembo`;
     } else {
-        document.title = 'Fembo';
+        document.title = 'Fembo 🦊';
     }
 }
 
@@ -643,4 +677,5 @@ document.addEventListener('click', (e) => {
     }
 });
 
-console.log('Fembo Messenger initialized');
+console.log('🦊 Fembo Messenger initialized');
+console.log('Open console to see debug information');
