@@ -86,6 +86,7 @@ socket.on('initial_data', (data) => {
     if (data.chats && data.chats.length > 0) {
         data.chats.forEach(chat => {
             chats.set(chat.id, chat);
+            // Сохраняем счетчик непрочитанных сообщений для оффлайн периода
             if (!unreadMessages.has(chat.id)) {
                 unreadMessages.set(chat.id, 0);
             }
@@ -104,7 +105,7 @@ socket.on('initial_data', (data) => {
     updateUsersLists();
     renderChatsList();
     
-    // Auto-select general chat if available
+    // Автоматически открываем общий чат
     const generalChat = Array.from(chats.values()).find(chat => chat.id === 'general_chat');
     if (generalChat) {
         openChat(generalChat.id);
@@ -232,6 +233,14 @@ socket.on('chat_exists', (chat) => {
     openChat(chat.id);
 });
 
+socket.on('open_chat', (chat) => {
+    // Сразу открываем созданный чат
+    const existingChat = chats.get(chat.id);
+    if (existingChat) {
+        openChat(chat.id);
+    }
+});
+
 socket.on('joined_chat', (chat) => {
     chats.set(chat.id, chat);
     renderChatsList();
@@ -267,6 +276,7 @@ socket.on('new_message', (data) => {
     if (chat) {
         chat.messages.push(data.message);
         
+        // Если сообщение не от текущего пользователя и чат не открыт
         if (data.message.sender !== currentUser.nick && 
             (!currentChat || currentChat.id !== data.chatId)) {
             const currentCount = unreadMessages.get(data.chatId) || 0;
@@ -275,6 +285,7 @@ socket.on('new_message', (data) => {
             playNotificationSound();
         }
         
+        // Если чат открыт, показываем сообщение сразу и сбрасываем счетчик
         if (currentChat && currentChat.id === data.chatId) {
             renderMessages(chat);
             scrollToBottom();
@@ -287,6 +298,7 @@ socket.on('new_message', (data) => {
 function createPrivateChat(user) {
     if (!user || !user.id) return;
     
+    // Проверяем, существует ли уже личный чат
     let existingChat = null;
     for (let [chatId, chat] of chats) {
         if (chat.isPrivate && chat.participants && chat.participants.length === 2) {
@@ -298,8 +310,10 @@ function createPrivateChat(user) {
     }
     
     if (existingChat) {
+        // Если чат существует, сразу открываем его
         openChat(existingChat.id);
     } else {
+        // Создаем новый личный чат
         const chatName = `Личный чат с ${user.nick}`;
         socket.emit('create_private_chat', chatName, user.id);
     }
@@ -472,6 +486,7 @@ function openChat(chatId) {
         renderMessages(chat);
         scrollToBottom();
         
+        // Сбрасываем счетчик непрочитанных при открытии чата
         unreadMessages.set(chatId, 0);
         newChats.delete(chatId);
         renderChatsList();

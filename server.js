@@ -212,7 +212,9 @@ io.on('connection', (socket) => {
     }
     
     socket.join(chatId);
-    socket.emit('chat_created', { id: chatId, name: chatName, isPrivate: true });
+    
+    // Сразу открываем чат у создателя
+    socket.emit('open_chat', { id: chatId, name: chatName, isPrivate: true });
     
     console.log(`💬 Private chat: ${chatName} between ${creator.nick} and ${targetUser.nick}`);
   });
