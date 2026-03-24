@@ -17,6 +17,7 @@ body {
     width: 100vw;
 }
 
+/* Sidebar styles */
 .sidebar {
     width: 320px;
     background: #0f0f0f;
@@ -297,6 +298,7 @@ body {
     text-align: center;
 }
 
+/* Chat area styles */
 .chat-area {
     flex: 1;
     display: flex;
@@ -399,12 +401,52 @@ body {
     text-align: right;
 }
 
+/* Image styles */
+.message-image {
+    max-width: 300px;
+    max-height: 300px;
+    border-radius: 0;
+    cursor: pointer;
+    margin-top: 5px;
+    display: block;
+}
+
+.message-image:hover {
+    opacity: 0.9;
+}
+
+/* Message input area */
 .message-input-container {
     padding: 20px;
     background: #0f0f0f;
     border-top: 1px solid #2a2a2a;
+}
+
+.input-actions {
     display: flex;
     gap: 10px;
+    align-items: flex-end;
+    width: 100%;
+}
+
+.image-upload-btn {
+    background: #2a2a2a;
+    border: none;
+    color: #e0e0e0;
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    border-radius: 0;
+}
+
+.image-upload-btn:hover {
+    background: #4a9eff;
+    color: white;
 }
 
 #messageInput {
@@ -432,6 +474,7 @@ body {
     cursor: pointer;
     transition: background 0.2s;
     font-size: 14px;
+    height: 40px;
 }
 
 #sendMessageBtn:hover {
@@ -439,6 +482,7 @@ body {
     color: white;
 }
 
+/* Modal styles */
 .modal {
     display: none;
     position: fixed;
@@ -541,6 +585,46 @@ body {
     font-size: 14px;
 }
 
+/* Image modal for fullscreen view */
+.image-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 3000;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+
+.image-modal.active {
+    display: flex;
+}
+
+.image-modal img {
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+}
+
+.image-modal .close-image {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    color: white;
+    font-size: 40px;
+    cursor: pointer;
+    font-family: monospace;
+}
+
+.image-modal .close-image:hover {
+    color: #4a9eff;
+}
+
+/* Scrollbar styles */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;

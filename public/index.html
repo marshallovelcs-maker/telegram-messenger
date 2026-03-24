@@ -67,8 +67,12 @@
             </div>
             
             <div class="message-input-container" style="display: none;">
-                <textarea id="messageInput" placeholder="Введите сообщение..." rows="3"></textarea>
-                <button id="sendMessageBtn">Отправить</button>
+                <div class="input-actions">
+                    <label for="imageUpload" class="image-upload-btn" title="Отправить изображение">📷</label>
+                    <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+                    <textarea id="messageInput" placeholder="Введите сообщение..." rows="3"></textarea>
+                    <button id="sendMessageBtn">Отправить</button>
+                </div>
             </div>
         </main>
     </div>
