@@ -41,6 +41,11 @@ const participantsList = document.getElementById('participantsList');
 const createChatBtn = document.getElementById('createChatBtn');
 const cancelChatBtn = document.getElementById('cancelChatBtn');
 
+// Mobile elements
+const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+const mobileBackBtn = document.getElementById('mobileBackBtn');
+const sidebar = document.getElementById('sidebar');
+
 // localStorage functions
 function saveUserNick(nick) {
     localStorage.setItem('fembo_user_nick', nick);
@@ -71,32 +76,6 @@ if (userNick) {
     socket.emit('register', userNick);
 }
 
-// Функция для отправки изображения
-function sendImage(file) {
-    if (!currentChat) {
-        alert('Выберите чат');
-        return;
-    }
-    
-    if (!file.type.startsWith('image/')) {
-        alert('Пожалуйста, выберите изображение');
-        return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const imageData = e.target.result;
-        // Отправляем изображение как base64
-        socket.emit('send_image', {
-            chatId: currentChat.id,
-            image: imageData,
-            sender: currentUser.nick,
-            senderId: currentUser.id
-        });
-    };
-    reader.readAsDataURL(file);
-}
-
 // Socket event handlers
 socket.on('initial_data', (data) => {
     console.log('Initial data:', data);
@@ -115,6 +94,7 @@ socket.on('initial_data', (data) => {
             chats.set(chat.id, chat);
             const unreadCount = chat.unreadCount || 0;
             unreadMessages.set(chat.id, unreadCount);
+            console.log(`Chat ${chat.name}: ${unreadCount} unread messages`);
         });
         console.log(`Loaded ${chats.size} chats`);
     }
@@ -306,52 +286,23 @@ socket.on('chat_deleted', (chatId) => {
         deleteChatBtn.style.display = 'none';
         messageInputContainer.style.display = 'none';
         messagesContainer.innerHTML = '<div class="empty-chat-message"><p>Выберите чат для начала общения</p></div>';
+        
+        // Скрываем кнопку назад на мобильных
+        if (window.innerWidth <= 768 && mobileBackBtn) {
+            mobileBackBtn.style.display = 'none';
+        }
     }
     renderChatsList();
 });
 
 socket.on('chat_deleted_success', (chatId) => {});
 
-// Обработчик текстовых сообщений
 socket.on('new_message', (data) => {
     const chat = chats.get(data.chatId);
     if (chat) {
         chat.messages.push(data.message);
         
         if (data.message.sender !== currentUser.nick && 
-            (!currentChat || currentChat.id !== data.chatId)) {
-            const currentCount = unreadMessages.get(data.chatId) || 0;
-            unreadMessages.set(data.chatId, currentCount + 1);
-            renderChatsList();
-            playNotificationSound();
-            updatePageTitle();
-        }
-        
-        if (currentChat && currentChat.id === data.chatId) {
-            renderMessages(chat);
-            scrollToBottom();
-            unreadMessages.set(data.chatId, 0);
-            renderChatsList();
-            socket.emit('mark_read', data.chatId);
-        }
-    }
-});
-
-// Обработчик изображений
-socket.on('new_image', (data) => {
-    const chat = chats.get(data.chatId);
-    if (chat) {
-        const imageMessage = {
-            id: Date.now().toString(),
-            type: 'image',
-            image: data.image,
-            sender: data.sender,
-            senderId: data.senderId,
-            timestamp: data.timestamp
-        };
-        chat.messages.push(imageMessage);
-        
-        if (data.sender !== currentUser.nick && 
             (!currentChat || currentChat.id !== data.chatId)) {
             const currentCount = unreadMessages.get(data.chatId) || 0;
             unreadMessages.set(data.chatId, currentCount + 1);
@@ -523,11 +474,7 @@ function renderChatsList() {
         const lastMessage = chat.messages[chat.messages.length - 1];
         let preview = 'Нет сообщений';
         if (lastMessage) {
-            if (lastMessage.type === 'image') {
-                preview = '📷 Изображение';
-            } else {
-                preview = lastMessage.text.length > 30 ? lastMessage.text.substring(0, 30) + '...' : lastMessage.text;
-            }
+            preview = lastMessage.text.length > 30 ? lastMessage.text.substring(0, 30) + '...' : lastMessage.text;
         }
         
         let displayName = chat.name;
@@ -571,30 +518,36 @@ function openChat(chatId) {
         
         newChats.delete(chatId);
         renderChatsList();
+        
+        // Показываем кнопку назад на мобильных
+        if (window.innerWidth <= 768 && mobileBackBtn) {
+            mobileBackBtn.style.display = 'flex';
+        }
     }
 }
 
 function renderMessages(chat) {
     if (!messagesContainer) return;
     messagesContainer.innerHTML = '';
+    
+    if (!chat.messages || chat.messages.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'empty-chat-message';
+        emptyDiv.innerHTML = '<p>Нет сообщений. Напишите что-нибудь!</p>';
+        messagesContainer.appendChild(emptyDiv);
+        return;
+    }
+    
     chat.messages.forEach(msg => {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${msg.sender === currentUser.nick ? 'own' : 'other'}`;
         const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
-        let content = '';
-        if (msg.type === 'image') {
-            content = `<img src="${msg.image}" class="message-image" onclick="openImageModal('${msg.image}')" alt="Изображение">`;
-        } else {
-            content = `<div class="message-content">${escapeHtml(msg.text)}</div>`;
-        }
-        
         messageDiv.innerHTML = `
             <div class="message-header">${escapeHtml(msg.sender)}</div>
-            ${content}
+            <div class="message-content">${escapeHtml(msg.text)}</div>
             <div class="message-time">${time}</div>
         `;
-        
         messagesContainer.appendChild(messageDiv);
     });
 }
@@ -617,6 +570,7 @@ function scrollToBottom() {
 }
 
 function escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
@@ -630,29 +584,66 @@ function updatePageTitle() {
     document.title = totalUnread > 0 ? `(${totalUnread}) Fembo` : 'Fembo 🦊';
 }
 
-function openImageModal(imageSrc) {
-    let modal = document.getElementById('imageModal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'imageModal';
-        modal.className = 'image-modal';
-        modal.innerHTML = `
-            <div class="close-image">&times;</div>
-            <img src="" alt="Просмотр изображения">
-        `;
-        document.body.appendChild(modal);
-        
-        modal.onclick = (e) => {
-            if (e.target === modal || e.target.className === 'close-image') {
-                modal.classList.remove('active');
-            }
-        };
+// Мобильные функции
+function closeMobileMenu() {
+    if (sidebar) {
+        sidebar.classList.remove('open');
     }
-    
-    const img = modal.querySelector('img');
-    img.src = imageSrc;
-    modal.classList.add('active');
 }
+
+function openMobileMenu() {
+    if (sidebar) {
+        sidebar.classList.add('open');
+    }
+}
+
+// Обработчик кнопки меню
+if (mobileMenuBtn) {
+    mobileMenuBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (sidebar && sidebar.classList.contains('open')) {
+            closeMobileMenu();
+        } else {
+            openMobileMenu();
+        }
+    };
+}
+
+// Обработчик кнопки назад
+if (mobileBackBtn) {
+    mobileBackBtn.onclick = () => {
+        // Закрываем чат и показываем список чатов
+        currentChat = null;
+        const chatHeaderH3 = chatHeader.querySelector('h3');
+        if (chatHeaderH3) chatHeaderH3.textContent = 'Выберите чат';
+        deleteChatBtn.style.display = 'none';
+        messageInputContainer.style.display = 'none';
+        messagesContainer.innerHTML = '<div class="empty-chat-message"><p>Выберите чат для начала общения</p></div>';
+        
+        closeMobileMenu();
+        mobileBackBtn.style.display = 'none';
+        renderChatsList();
+    };
+}
+
+// При клике вне меню закрываем его
+document.addEventListener('click', (e) => {
+    if (window.innerWidth <= 768 && sidebar && sidebar.classList.contains('open')) {
+        if (mobileMenuBtn && !mobileMenuBtn.contains(e.target) && !sidebar.contains(e.target)) {
+            closeMobileMenu();
+        }
+    }
+});
+
+// При изменении размера окна
+window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) {
+        if (sidebar) sidebar.classList.remove('open');
+        if (mobileBackBtn) mobileBackBtn.style.display = 'none';
+    } else if (currentChat && mobileBackBtn) {
+        mobileBackBtn.style.display = 'flex';
+    }
+});
 
 setInterval(updatePageTitle, 1000);
 
@@ -660,7 +651,8 @@ setInterval(updatePageTitle, 1000);
 if (imageUpload) {
     imageUpload.onchange = (e) => {
         if (e.target.files && e.target.files[0]) {
-            sendImage(e.target.files[0]);
+            // Функция отправки изображения (заглушка, без отправки)
+            alert('Отправка изображений временно отключена');
             imageUpload.value = '';
         }
     };
@@ -780,4 +772,4 @@ document.addEventListener('click', (e) => {
     }
 });
 
-console.log('🦊 Fembo Messenger ready with image support');
+console.log('🦊 Fembo Messenger ready with mobile support');
