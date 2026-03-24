@@ -19,8 +19,8 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Хранилище данных
-let users = new Map(); // socketId -> { nick, chats }
-let chats = new Map(); // chatId -> { name, participants, messages, isPrivate }
+let users = new Map();
+let chats = new Map();
 
 // Создание тестового чата
 const testChatId = Date.now().toString();
@@ -60,20 +60,19 @@ io.on('connection', (socket) => {
     
     socket.join(testChatId);
     
-    // Добавляем пользователя в участники тестового чата
     const testChat = chats.get(testChatId);
     if (testChat && !testChat.participants.includes(socket.id)) {
       testChat.participants.push(socket.id);
     }
     
-    // Отправляем историю чатов
     const userChats = Array.from(chats.entries())
       .filter(([chatId]) => users.get(socket.id).chats.includes(chatId))
       .map(([chatId, chat]) => ({
         id: chatId,
         name: chat.name,
         messages: chat.messages,
-        isPrivate: chat.isPrivate
+        isPrivate: chat.isPrivate,
+        participants: chat.participants
       }));
     
     socket.emit('initial_data', {
@@ -82,9 +81,7 @@ io.on('connection', (socket) => {
       onlineUsers: Array.from(users.values()).map(u => u.nick)
     });
     
-    // Уведомляем всех о новом пользователе
     io.emit('user_online', { nick: nick, id: socket.id });
-    
     console.log(`User registered: ${nick}`);
   });
   
@@ -105,34 +102,34 @@ io.on('connection', (socket) => {
       createdAt: new Date()
     };
     
-    // Добавляем чат обоим пользователям
     creator.chats.push(chatId);
     targetUser.chats.push(chatId);
     
     chats.set(chatId, newChat);
     
-    // Отправляем чат создателю
     socket.emit('new_chat', {
       id: chatId,
       name: chatName,
       messages: [],
-      isPrivate: true
+      isPrivate: true,
+      participants: [socket.id, targetUserId]
     });
     
-    // Отправляем чат второму пользователю (без уведомления)
     io.to(targetUserId).emit('new_chat', {
       id: chatId,
       name: chatName,
       messages: [],
-      isPrivate: true
+      isPrivate: true,
+      participants: [socket.id, targetUserId]
     });
     
-    // Присоединяем обоих к комнате чата
     socket.join(chatId);
-    io.sockets.sockets.get(targetUserId)?.join(chatId);
+    const targetSocket = io.sockets.sockets.get(targetUserId);
+    if (targetSocket) {
+      targetSocket.join(chatId);
+    }
     
     socket.emit('chat_created', { id: chatId, name: chatName, isPrivate: true });
-    
     console.log(`Private chat created: ${chatName} between ${creator.nick} and ${targetUser.nick}`);
   });
   
@@ -144,7 +141,6 @@ io.on('connection', (socket) => {
     const chatId = Date.now().toString();
     const participants = [socket.id];
     
-    // Находим ID участников по никам
     participantNicks.forEach(nick => {
       const user = Array.from(users.values()).find(u => u.nick === nick);
       if (user && !participants.includes(user.id)) {
@@ -161,7 +157,6 @@ io.on('connection', (socket) => {
       createdAt: new Date()
     };
     
-    // Добавляем чат всем участникам
     participants.forEach(participantId => {
       const user = users.get(participantId);
       if (user) {
@@ -173,7 +168,8 @@ io.on('connection', (socket) => {
             id: chatId,
             name: chatName,
             messages: [],
-            isPrivate: false
+            isPrivate: false,
+            participants: participants
           });
         }
       }
@@ -181,9 +177,7 @@ io.on('connection', (socket) => {
     
     chats.set(chatId, newChat);
     socket.join(chatId);
-    
     socket.emit('chat_created', { id: chatId, name: chatName, isPrivate: false });
-    
     console.log(`Group chat created: ${chatName} with ${participants.length} participants`);
   });
   
@@ -204,7 +198,6 @@ io.on('connection', (socket) => {
     
     io.emit('nick_changed', { oldNick: oldNick, newNick: newNick, id: socket.id });
     socket.emit('nick_changed_success', { newNick: newNick });
-    
     console.log(`${oldNick} changed nick to ${newNick}`);
   });
   
@@ -213,7 +206,6 @@ io.on('connection', (socket) => {
     const searchResults = Array.from(users.values())
       .filter(user => user.nick.toLowerCase().includes(query.toLowerCase()) && user.id !== socket.id)
       .map(user => ({ nick: user.nick, id: user.id }));
-    
     socket.emit('search_results', searchResults);
   });
   
@@ -226,14 +218,13 @@ io.on('connection', (socket) => {
       user.chats.push(chatId);
       chat.participants.push(socket.id);
       socket.join(chatId);
-      
       socket.emit('joined_chat', { 
         id: chatId, 
         name: chat.name, 
         messages: chat.messages,
-        isPrivate: chat.isPrivate
+        isPrivate: chat.isPrivate,
+        participants: chat.participants
       });
-      
       io.to(chatId).emit('user_joined', { nick: user.nick, chatId: chatId });
     }
   });
@@ -244,7 +235,6 @@ io.on('connection', (socket) => {
     const chat = chats.get(chatId);
     
     if (chat && user) {
-      // Удаляем чат у всех участников
       chat.participants.forEach(participantId => {
         const participant = users.get(participantId);
         if (participant) {
@@ -253,7 +243,6 @@ io.on('connection', (socket) => {
           io.to(participantId).emit('chat_deleted', chatId);
         }
       });
-      
       chats.delete(chatId);
       socket.emit('chat_deleted_success', chatId);
       console.log(`Chat deleted: ${chat.name}`);
@@ -276,13 +265,10 @@ io.on('connection', (socket) => {
       };
       
       chat.messages.push(messageObj);
-      
-      // Отправляем сообщение всем в чате
       io.to(chatId).emit('new_message', {
         chatId: chatId,
         message: messageObj
       });
-      
       console.log(`Message in ${chat.name} from ${user.nick}: ${message}`);
     }
   });
@@ -298,7 +284,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// Обработка всех остальных маршрутов - отдаем index.html
+// Обработка всех остальных маршрутов
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
