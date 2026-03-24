@@ -28,7 +28,6 @@ const messageInputContainer = document.querySelector('.message-input-container')
 const messageInput = document.getElementById('messageInput');
 const sendMessageBtn = document.getElementById('sendMessageBtn');
 const deleteChatBtn = document.getElementById('deleteChatBtn');
-const imageUpload = document.getElementById('imageUpload');
 
 // Modals
 const nickModal = document.getElementById('nickModal');
@@ -71,38 +70,6 @@ if (userNick) {
     socket.emit('register', userNick);
 }
 
-// Функция отправки фото
-function sendImage(file) {
-    if (!currentChat) {
-        alert('Выберите чат');
-        return;
-    }
-    
-    if (!file.type.startsWith('image/')) {
-        alert('Пожалуйста, выберите изображение');
-        return;
-    }
-    
-    // Ограничение размера 2MB
-    if (file.size > 2 * 1024 * 1024) {
-        alert('Изображение слишком большое. Максимальный размер 2MB');
-        return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const imageData = e.target.result;
-        socket.emit('send_image', {
-            chatId: currentChat.id,
-            image: imageData
-        });
-    };
-    reader.onerror = () => {
-        alert('Ошибка при загрузке изображения');
-    };
-    reader.readAsDataURL(file);
-}
-
 // Socket event handlers
 socket.on('initial_data', (data) => {
     console.log('Initial data:', data);
@@ -119,8 +86,10 @@ socket.on('initial_data', (data) => {
     if (data.chats && data.chats.length > 0) {
         data.chats.forEach(chat => {
             chats.set(chat.id, chat);
+            // Сохраняем счетчик непрочитанных сообщений
             const unreadCount = chat.unreadCount || 0;
             unreadMessages.set(chat.id, unreadCount);
+            console.log(`Chat ${chat.name}: ${unreadCount} unread messages`);
         });
         console.log(`Loaded ${chats.size} chats`);
     }
@@ -143,6 +112,7 @@ socket.on('initial_data', (data) => {
     }
     if (totalUnread > 0) {
         console.log(`📨 You have ${totalUnread} unread messages`);
+        // Можем показать всплывающее уведомление
         if (Notification.permission === 'granted') {
             new Notification(`Fembo`, {
                 body: `У вас ${totalUnread} непрочитанных сообщений`,
@@ -318,59 +288,30 @@ socket.on('chat_deleted', (chatId) => {
 
 socket.on('chat_deleted_success', (chatId) => {});
 
-// Обработчик текстовых сообщений
 socket.on('new_message', (data) => {
     const chat = chats.get(data.chatId);
     if (chat) {
         chat.messages.push(data.message);
         
+        // Если сообщение не от текущего пользователя и чат не открыт
         if (data.message.sender !== currentUser.nick && 
             (!currentChat || currentChat.id !== data.chatId)) {
             const currentCount = unreadMessages.get(data.chatId) || 0;
             unreadMessages.set(data.chatId, currentCount + 1);
             renderChatsList();
             playNotificationSound();
+            
+            // Обновляем заголовок страницы
             updatePageTitle();
         }
         
+        // Если чат открыт, показываем сообщение сразу и сбрасываем счетчик
         if (currentChat && currentChat.id === data.chatId) {
             renderMessages(chat);
             scrollToBottom();
             unreadMessages.set(data.chatId, 0);
             renderChatsList();
-            socket.emit('mark_read', data.chatId);
-        }
-    }
-});
-
-// Обработчик фото
-socket.on('new_image', (data) => {
-    const chat = chats.get(data.chatId);
-    if (chat) {
-        const imageMessage = {
-            id: Date.now().toString(),
-            type: 'image',
-            image: data.image,
-            sender: data.sender,
-            senderId: data.senderId,
-            timestamp: data.timestamp
-        };
-        chat.messages.push(imageMessage);
-        
-        if (data.sender !== currentUser.nick && 
-            (!currentChat || currentChat.id !== data.chatId)) {
-            const currentCount = unreadMessages.get(data.chatId) || 0;
-            unreadMessages.set(data.chatId, currentCount + 1);
-            renderChatsList();
-            playNotificationSound();
-            updatePageTitle();
-        }
-        
-        if (currentChat && currentChat.id === data.chatId) {
-            renderMessages(chat);
-            scrollToBottom();
-            unreadMessages.set(data.chatId, 0);
-            renderChatsList();
+            // Отправляем на сервер, что сообщения прочитаны
             socket.emit('mark_read', data.chatId);
         }
     }
@@ -379,6 +320,7 @@ socket.on('new_image', (data) => {
 function createPrivateChat(user) {
     if (!user || !user.id) return;
     
+    // Проверяем, существует ли уже личный чат
     let existingChat = null;
     for (let [chatId, chat] of chats) {
         if (chat.isPrivate && chat.participants && chat.participants.length === 2) {
@@ -529,11 +471,7 @@ function renderChatsList() {
         const lastMessage = chat.messages[chat.messages.length - 1];
         let preview = 'Нет сообщений';
         if (lastMessage) {
-            if (lastMessage.type === 'image') {
-                preview = '📷 Изображение';
-            } else {
-                preview = lastMessage.text.length > 30 ? lastMessage.text.substring(0, 30) + '...' : lastMessage.text;
-            }
+            preview = lastMessage.text.length > 30 ? lastMessage.text.substring(0, 30) + '...' : lastMessage.text;
         }
         
         let displayName = chat.name;
@@ -568,6 +506,7 @@ function openChat(chatId) {
         renderMessages(chat);
         scrollToBottom();
         
+        // Сбрасываем счетчик непрочитанных при открытии чата
         if (unreadMessages.get(chatId) > 0) {
             unreadMessages.set(chatId, 0);
             socket.emit('mark_read', chatId);
@@ -583,33 +522,16 @@ function openChat(chatId) {
 function renderMessages(chat) {
     if (!messagesContainer) return;
     messagesContainer.innerHTML = '';
-    
-    if (!chat.messages || chat.messages.length === 0) {
-        const emptyDiv = document.createElement('div');
-        emptyDiv.className = 'empty-chat-message';
-        emptyDiv.innerHTML = '<p>Нет сообщений. Напишите что-нибудь!</p>';
-        messagesContainer.appendChild(emptyDiv);
-        return;
-    }
-    
     chat.messages.forEach(msg => {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${msg.sender === currentUser.nick ? 'own' : 'other'}`;
         const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
-        let content = '';
-        if (msg.type === 'image') {
-            content = `<img src="${msg.image}" class="message-image" onclick="openImageModal('${msg.image}')" alt="Изображение" loading="lazy">`;
-        } else {
-            content = `<div class="message-content">${escapeHtml(msg.text || '')}</div>`;
-        }
-        
         messageDiv.innerHTML = `
             <div class="message-header">${escapeHtml(msg.sender)}</div>
-            ${content}
+            <div class="message-content">${escapeHtml(msg.text)}</div>
             <div class="message-time">${time}</div>
         `;
-        
         messagesContainer.appendChild(messageDiv);
     });
 }
@@ -632,7 +554,6 @@ function scrollToBottom() {
 }
 
 function escapeHtml(text) {
-    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
@@ -646,43 +567,9 @@ function updatePageTitle() {
     document.title = totalUnread > 0 ? `(${totalUnread}) Fembo` : 'Fembo 🦊';
 }
 
-// Глобальная функция для открытия фото
-window.openImageModal = function(imageSrc) {
-    let modal = document.getElementById('imageModal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'imageModal';
-        modal.className = 'image-modal';
-        modal.innerHTML = `
-            <div class="close-image">&times;</div>
-            <img src="" alt="Просмотр изображения">
-        `;
-        document.body.appendChild(modal);
-        
-        modal.onclick = (e) => {
-            if (e.target === modal || e.target.className === 'close-image') {
-                modal.classList.remove('active');
-            }
-        };
-    }
-    
-    const img = modal.querySelector('img');
-    img.src = imageSrc;
-    modal.classList.add('active');
-};
-
 setInterval(updatePageTitle, 1000);
 
 // Event listeners
-if (imageUpload) {
-    imageUpload.onchange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            sendImage(e.target.files[0]);
-            imageUpload.value = '';
-        }
-    };
-}
-
 if (editNickBtn) {
     editNickBtn.onclick = () => {
         newNickInput.value = currentUser.nick;
@@ -797,4 +684,4 @@ document.addEventListener('click', (e) => {
     }
 });
 
-console.log('🦊 Fembo Messenger ready with image support');
+console.log('🦊 Fembo Messenger ready');
