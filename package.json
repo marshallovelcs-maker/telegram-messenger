@@ -1,0 +1,21 @@
+{
+  "name": "telegram-messenger",
+  "version": "1.0.0",
+  "description": "Telegram-like messenger",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": "18.x",
+    "npm": "9.x"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.5.4",
+    "cors": "^2.8.5"
+  },
+  "keywords": ["messenger", "chat", "realtime"],
+  "author": "Your Name",
+  "license": "MIT"
+}

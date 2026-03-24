@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dark Messenger</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Боковая панель -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Messenger</h2>
+                <button class="new-chat-btn" id="newChatBtn">+</button>
+            </div>
+            
+            <div class="user-info">
+                <span id="currentNick">Загрузка...</span>
+                <button class="edit-nick-btn" id="editNickBtn">✎</button>
+            </div>
+            
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Поиск по нику..." class="search-input">
+                <div id="searchResults" class="search-results"></div>
+            </div>
+            
+            <div class="online-users">
+                <h3>Онлайн</h3>
+                <div id="onlineUsersList" class="users-list"></div>
+            </div>
+            
+            <div class="chats-list">
+                <h3>Чаты</h3>
+                <div id="chatsList" class="chats-container"></div>
+            </div>
+        </aside>
+        
+        <!-- Основная область чата -->
+        <main class="chat-area">
+            <div class="chat-header" id="chatHeader">
+                <h3>Выберите чат</h3>
+                <button class="delete-chat-btn" id="deleteChatBtn" style="display: none;">Удалить чат</button>
+            </div>
+            
+            <div class="messages-container" id="messagesContainer">
+                <div class="empty-chat-message">
+                    <p>Выберите чат для начала общения</p>
+                </div>
+            </div>
+            
+            <div class="message-input-container" style="display: none;">
+                <textarea id="messageInput" placeholder="Введите сообщение..." rows="3"></textarea>
+                <button id="sendMessageBtn">Отправить</button>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Модальные окна -->
+    <div id="nickModal" class="modal">
+        <div class="modal-content">
+            <h3>Сменить ник</h3>
+            <input type="text" id="newNickInput" placeholder="Введите новый ник">
+            <button id="confirmNickBtn">Подтвердить</button>
+            <button id="cancelNickBtn">Отмена</button>
+        </div>
+    </div>
+    
+    <div id="newChatModal" class="modal">
+        <div class="modal-content">
+            <h3>Новый чат</h3>
+            <input type="text" id="chatNameInput" placeholder="Название чата">
+            <div class="participants-select">
+                <h4>Участники</h4>
+                <div id="participantsList"></div>
+            </div>
+            <button id="createChatBtn">Создать чат</button>
+            <button id="cancelChatBtn">Отмена</button>
+        </div>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
