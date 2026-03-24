@@ -4,8 +4,7 @@ const socket = io();
 let currentUser = null;
 let currentChat = null;
 let chats = new Map();
-let onlineUsers = new Set();
-let allUsers = new Map();
+let onlineUsers = new Map(); // Изменяем Set на Map (nick -> user data)
 let unreadMessages = new Map();
 let newChats = new Set();
 
@@ -53,8 +52,9 @@ socket.on('initial_data', (data) => {
         }
     });
     
-    data.onlineUsers.forEach(nick => {
-        onlineUsers.add(nick);
+    // Сохраняем пользователей с их ID
+    data.onlineUsers.forEach(user => {
+        onlineUsers.set(user.nick, user);
     });
     
     updateOnlineUsersList();
@@ -70,8 +70,7 @@ socket.on('registration_error', (error) => {
 });
 
 socket.on('user_online', (user) => {
-    onlineUsers.add(user.nick);
-    allUsers.set(user.id, user);
+    onlineUsers.set(user.nick, user);
     updateOnlineUsersList();
 });
 
@@ -86,8 +85,13 @@ socket.on('nick_changed', (data) => {
         currentNickSpan.textContent = data.newNick;
     }
     
-    onlineUsers.delete(data.oldNick);
-    onlineUsers.add(data.newNick);
+    // Обновляем ник в списке пользователей
+    const userData = onlineUsers.get(data.oldNick);
+    if (userData) {
+        onlineUsers.delete(data.oldNick);
+        onlineUsers.set(data.newNick, { ...userData, nick: data.newNick });
+    }
+    
     updateOnlineUsersList();
     
     chats.forEach(chat => {
@@ -133,6 +137,7 @@ socket.on('search_results', (results) => {
 });
 
 socket.on('new_chat', (chat) => {
+    console.log('New chat received:', chat);
     chats.set(chat.id, chat);
     unreadMessages.set(chat.id, 0);
     newChats.add(chat.id);
@@ -141,6 +146,7 @@ socket.on('new_chat', (chat) => {
 });
 
 socket.on('chat_created', (chat) => {
+    console.log('Chat created:', chat);
     newChatModal.classList.remove('active');
 });
 
@@ -172,7 +178,9 @@ socket.on('chat_deleted', (chatId) => {
     renderChatsList();
 });
 
-socket.on('chat_deleted_success', (chatId) => {});
+socket.on('chat_deleted_success', (chatId) => {
+    console.log('Chat deleted:', chatId);
+});
 
 socket.on('new_message', (data) => {
     const chat = chats.get(data.chatId);
@@ -196,13 +204,20 @@ socket.on('new_message', (data) => {
     }
 });
 
+// Функция для создания личного чата
 function createPrivateChat(user) {
+    console.log('Creating private chat with:', user);
+    
+    if (!user || !user.id) {
+        console.error('Invalid user data:', user);
+        return;
+    }
+    
+    // Проверяем, существует ли уже личный чат с этим пользователем
     let existingChat = null;
     for (let [chatId, chat] of chats) {
-        if (chat.name === `Личный чат с ${user.nick}` || 
-            (chat.isPrivate && chat.participants && chat.participants.length === 2)) {
-            const participants = chat.participants || [];
-            if (participants.includes(currentUser.id) && participants.includes(user.id)) {
+        if (chat.isPrivate && chat.participants && chat.participants.length === 2) {
+            if (chat.participants.includes(currentUser.id) && chat.participants.includes(user.id)) {
                 existingChat = chat;
                 break;
             }
@@ -210,13 +225,16 @@ function createPrivateChat(user) {
     }
     
     if (existingChat) {
+        console.log('Existing chat found:', existingChat);
         openChat(existingChat.id);
     } else {
         const chatName = `Личный чат с ${user.nick}`;
+        console.log('Creating new private chat:', chatName, user.id);
         socket.emit('create_private_chat', chatName, user.id);
     }
 }
 
+// Функция для создания группового чата
 function createGroupChat() {
     const chatName = chatNameInput.value.trim();
     if (!chatName) {
@@ -235,6 +253,7 @@ function createGroupChat() {
     chatNameInput.value = '';
 }
 
+// Функция воспроизведения звука
 function playNotificationSound() {
     try {
         const audio = new Audio('data:audio/wav;base64,U3RlYWx0aCBzb3VuZA==');
@@ -245,27 +264,22 @@ function playNotificationSound() {
     }
 }
 
+// Обновление списка онлайн пользователей
 function updateOnlineUsersList() {
     onlineUsersList.innerHTML = '';
-    const sortedUsers = Array.from(onlineUsers).sort();
+    const sortedUsers = Array.from(onlineUsers.values()).sort((a, b) => a.nick.localeCompare(b.nick));
     let hasUsers = false;
     
-    sortedUsers.forEach(nick => {
-        if (nick !== currentUser?.nick) {
+    sortedUsers.forEach(user => {
+        if (user.nick !== currentUser?.nick) {
             hasUsers = true;
             const div = document.createElement('div');
             div.className = 'user-item';
-            div.textContent = nick;
+            div.textContent = user.nick;
             div.style.cursor = 'pointer';
             div.title = 'Нажмите для создания личного чата';
             div.onclick = () => {
-                const user = { nick: nick, id: null };
-                for (let [id, u] of allUsers) {
-                    if (u.nick === nick) {
-                        user.id = id;
-                        break;
-                    }
-                }
+                console.log('Clicked on user:', user);
                 createPrivateChat(user);
             };
             onlineUsersList.appendChild(div);
@@ -280,6 +294,7 @@ function updateOnlineUsersList() {
     }
 }
 
+// Рендер списка чатов
 function renderChatsList() {
     chatsList.innerHTML = '';
     
@@ -328,9 +343,20 @@ function renderChatsList() {
         }
         
         let displayName = chat.name;
-        if (chat.isPrivate && chat.name.includes(currentUser.nick)) {
-            const otherUser = chat.name.replace(`Личный чат с `, '').replace(currentUser.nick, '').replace(' и ', '').trim();
-            displayName = otherUser || chat.name;
+        if (chat.isPrivate && currentUser) {
+            // Для личных чатов показываем имя собеседника
+            if (chat.participants && chat.participants.length === 2) {
+                const otherParticipantId = chat.participants.find(id => id !== currentUser.id);
+                if (otherParticipantId) {
+                    const otherUser = Array.from(onlineUsers.values()).find(u => u.id === otherParticipantId);
+                    if (otherUser) {
+                        displayName = otherUser.nick;
+                    } else {
+                        // Если пользователь не онлайн, пытаемся извлечь из названия
+                        displayName = chat.name.replace('Личный чат с ', '');
+                    }
+                }
+            }
         }
         
         div.innerHTML = `
@@ -344,6 +370,7 @@ function renderChatsList() {
     });
 }
 
+// Открытие чата
 function openChat(chatId) {
     const chat = chats.get(chatId);
     if (chat) {
@@ -351,9 +378,16 @@ function openChat(chatId) {
         const chatHeaderH3 = chatHeader.querySelector('h3');
         if (chatHeaderH3) {
             let displayName = chat.name;
-            if (chat.isPrivate && chat.name.includes(currentUser.nick)) {
-                const otherUser = chat.name.replace(`Личный чат с `, '').replace(currentUser.nick, '').replace(' и ', '').trim();
-                displayName = otherUser || chat.name;
+            if (chat.isPrivate && currentUser) {
+                if (chat.participants && chat.participants.length === 2) {
+                    const otherParticipantId = chat.participants.find(id => id !== currentUser.id);
+                    if (otherParticipantId) {
+                        const otherUser = Array.from(onlineUsers.values()).find(u => u.id === otherParticipantId);
+                        if (otherUser) {
+                            displayName = otherUser.nick;
+                        }
+                    }
+                }
             }
             chatHeaderH3.textContent = displayName;
         }
@@ -368,6 +402,7 @@ function openChat(chatId) {
     }
 }
 
+// Рендер сообщений
 function renderMessages(chat) {
     if (!messagesContainer) return;
     messagesContainer.innerHTML = '';
@@ -387,6 +422,7 @@ function renderMessages(chat) {
     });
 }
 
+// Добавление системного сообщения
 function addSystemMessage(text) {
     const messageDiv = document.createElement('div');
     messageDiv.className = 'message other';
@@ -398,18 +434,21 @@ function addSystemMessage(text) {
     scrollToBottom();
 }
 
+// Скролл вниз
 function scrollToBottom() {
     if (messagesContainer) {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 }
 
+// Эскейп HTML
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
+// Обновление заголовка страницы
 function updatePageTitle() {
     let totalUnread = 0;
     for (let count of unreadMessages.values()) {
@@ -453,23 +492,23 @@ if (newChatBtn) {
     newChatBtn.onclick = () => {
         chatNameInput.value = '';
         participantsList.innerHTML = '';
-        const onlineUsersList_temp = Array.from(onlineUsers);
-        if (onlineUsersList_temp.length === 0 || (onlineUsersList_temp.length === 1 && onlineUsersList_temp[0] === currentUser.nick)) {
+        const onlineUsersArray = Array.from(onlineUsers.values());
+        const otherUsers = onlineUsersArray.filter(u => u.nick !== currentUser.nick);
+        
+        if (otherUsers.length === 0) {
             const emptyDiv = document.createElement('div');
             emptyDiv.className = 'empty-message';
             emptyDiv.textContent = 'Нет других пользователей онлайн для создания группового чата';
             participantsList.appendChild(emptyDiv);
         } else {
-            onlineUsersList_temp.forEach(nick => {
-                if (nick !== currentUser.nick) {
-                    const div = document.createElement('div');
-                    div.className = 'participant-checkbox';
-                    div.innerHTML = `
-                        <input type="checkbox" value="${escapeHtml(nick)}" id="user_${escapeHtml(nick)}">
-                        <label for="user_${escapeHtml(nick)}">${escapeHtml(nick)}</label>
-                    `;
-                    participantsList.appendChild(div);
-                }
+            otherUsers.forEach(user => {
+                const div = document.createElement('div');
+                div.className = 'participant-checkbox';
+                div.innerHTML = `
+                    <input type="checkbox" value="${escapeHtml(user.nick)}" id="user_${escapeHtml(user.nick)}">
+                    <label for="user_${escapeHtml(user.nick)}">${escapeHtml(user.nick)}</label>
+                `;
+                participantsList.appendChild(div);
             });
         }
         newChatModal.classList.add('active');
@@ -539,3 +578,5 @@ document.addEventListener('click', (e) => {
         searchResults.classList.remove('active');
     }
 });
+
+console.log('App initialized');
