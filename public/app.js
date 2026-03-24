@@ -4,7 +4,7 @@ const socket = io();
 let currentUser = null;
 let currentChat = null;
 let chats = new Map();
-let onlineUsers = new Map();
+let allUsers = new Map(); // id -> { nick, online, lastSeen }
 let unreadMessages = new Map();
 let newChats = new Set();
 
@@ -15,6 +15,7 @@ const newChatBtn = document.getElementById('newChatBtn');
 const searchInput = document.getElementById('searchInput');
 const searchResults = document.getElementById('searchResults');
 const onlineUsersList = document.getElementById('onlineUsersList');
+const offlineUsersList = document.getElementById('offlineUsersList');
 const chatsList = document.getElementById('chatsList');
 const chatHeader = document.getElementById('chatHeader');
 const messagesContainer = document.getElementById('messagesContainer');
@@ -36,14 +37,14 @@ const cancelChatBtn = document.getElementById('cancelChatBtn');
 
 // Функции для работы с localStorage
 function saveUserNick(nick) {
-    localStorage.setItem('messenger_user_nick', nick);
+    localStorage.setItem('fembo_user_nick', nick);
 }
 
 function getSavedNick() {
-    return localStorage.getItem('messenger_user_nick');
+    return localStorage.getItem('fembo_user_nick');
 }
 
-// Registration - проверяем сохраненный ник
+// Registration
 let userNick = getSavedNick();
 if (!userNick) {
     userNick = prompt('Введите ваш ник:', 'User' + Math.floor(Math.random() * 1000));
@@ -51,7 +52,6 @@ if (!userNick) {
         saveUserNick(userNick);
     }
 } else {
-    // Спрашиваем, хочет ли пользователь использовать сохраненный ник
     const useSaved = confirm(`Использовать сохраненный ник "${userNick}"?`);
     if (!useSaved) {
         userNick = prompt('Введите новый ник:', userNick);
@@ -77,18 +77,18 @@ socket.on('initial_data', (data) => {
         }
     });
     
-    data.onlineUsers.forEach(user => {
-        onlineUsers.set(user.nick, user);
+    // Сохраняем всех пользователей (онлайн и оффлайн)
+    data.allUsers.forEach(user => {
+        allUsers.set(user.id, user);
     });
     
-    updateOnlineUsersList();
+    updateUsersLists();
     renderChatsList();
 });
 
 socket.on('registration_error', (error) => {
     alert(error);
-    // Очищаем сохраненный ник при ошибке
-    localStorage.removeItem('messenger_user_nick');
+    localStorage.removeItem('fembo_user_nick');
     const newNick = prompt('Введите другой ник:');
     if (newNick) {
         saveUserNick(newNick);
@@ -97,9 +97,15 @@ socket.on('registration_error', (error) => {
 });
 
 socket.on('user_online', (user) => {
-    onlineUsers.set(user.nick, user);
-    updateOnlineUsersList();
-    // Обновляем отображение чатов (для обновления имен)
+    const existingUser = allUsers.get(user.id);
+    if (existingUser) {
+        existingUser.online = true;
+        existingUser.lastSeen = new Date();
+        allUsers.set(user.id, existingUser);
+    } else {
+        allUsers.set(user.id, { ...user, online: true, lastSeen: new Date() });
+    }
+    updateUsersLists();
     renderChatsList();
     if (currentChat) {
         updateChatHeaderTitle(currentChat);
@@ -107,8 +113,13 @@ socket.on('user_online', (user) => {
 });
 
 socket.on('user_offline', (user) => {
-    onlineUsers.delete(user.nick);
-    updateOnlineUsersList();
+    const existingUser = allUsers.get(user.id);
+    if (existingUser) {
+        existingUser.online = false;
+        existingUser.lastSeen = new Date();
+        allUsers.set(user.id, existingUser);
+    }
+    updateUsersLists();
     renderChatsList();
     if (currentChat) {
         updateChatHeaderTitle(currentChat);
@@ -122,13 +133,13 @@ socket.on('nick_changed', (data) => {
         saveUserNick(data.newNick);
     }
     
-    const userData = onlineUsers.get(data.oldNick);
+    const userData = allUsers.get(data.id);
     if (userData) {
-        onlineUsers.delete(data.oldNick);
-        onlineUsers.set(data.newNick, { ...userData, nick: data.newNick });
+        userData.nick = data.newNick;
+        allUsers.set(data.id, userData);
     }
     
-    updateOnlineUsersList();
+    updateUsersLists();
     
     chats.forEach(chat => {
         chat.messages.forEach(msg => {
@@ -137,7 +148,6 @@ socket.on('nick_changed', (data) => {
             }
         });
         
-        // Обновляем название личного чата если нужно
         if (chat.isPrivate && chat.name.includes(data.oldNick)) {
             chat.name = chat.name.replace(data.oldNick, data.newNick);
         }
@@ -182,7 +192,6 @@ socket.on('search_results', (results) => {
 });
 
 socket.on('new_chat', (chat) => {
-    console.log('New chat received:', chat);
     chats.set(chat.id, chat);
     unreadMessages.set(chat.id, 0);
     newChats.add(chat.id);
@@ -191,7 +200,6 @@ socket.on('new_chat', (chat) => {
 });
 
 socket.on('chat_created', (chat) => {
-    console.log('Chat created:', chat);
     newChatModal.classList.remove('active');
 });
 
@@ -223,9 +231,7 @@ socket.on('chat_deleted', (chatId) => {
     renderChatsList();
 });
 
-socket.on('chat_deleted_success', (chatId) => {
-    console.log('Chat deleted:', chatId);
-});
+socket.on('chat_deleted_success', (chatId) => {});
 
 socket.on('new_message', (data) => {
     const chat = chats.get(data.chatId);
@@ -249,16 +255,12 @@ socket.on('new_message', (data) => {
     }
 });
 
-// Функция для создания личного чата
 function createPrivateChat(user) {
-    console.log('Creating private chat with:', user);
-    
     if (!user || !user.id) {
         console.error('Invalid user data:', user);
         return;
     }
     
-    // Проверяем, существует ли уже личный чат с этим пользователем
     let existingChat = null;
     for (let [chatId, chat] of chats) {
         if (chat.isPrivate && chat.participants && chat.participants.length === 2) {
@@ -270,17 +272,13 @@ function createPrivateChat(user) {
     }
     
     if (existingChat) {
-        console.log('Existing chat found:', existingChat);
         openChat(existingChat.id);
     } else {
-        // Название чата всегда "Личный чат с [ник собеседника]"
         const chatName = `Личный чат с ${user.nick}`;
-        console.log('Creating new private chat:', chatName, user.id);
         socket.emit('create_private_chat', chatName, user.id);
     }
 }
 
-// Функция для создания группового чата
 function createGroupChat() {
     const chatName = chatNameInput.value.trim();
     if (!chatName) {
@@ -299,7 +297,6 @@ function createGroupChat() {
     chatNameInput.value = '';
 }
 
-// Функция воспроизведения звука
 function playNotificationSound() {
     try {
         const audio = new Audio('data:audio/wav;base64,U3RlYWx0aCBzb3VuZA==');
@@ -310,21 +307,18 @@ function playNotificationSound() {
     }
 }
 
-// Обновление заголовка чата
 function updateChatHeaderTitle(chat) {
     const chatHeaderH3 = chatHeader.querySelector('h3');
     if (chatHeaderH3) {
         let displayName = chat.name;
         if (chat.isPrivate && currentUser) {
-            // Для личных чатов показываем имя собеседника
             if (chat.participants && chat.participants.length === 2) {
                 const otherParticipantId = chat.participants.find(id => id !== currentUser.id);
                 if (otherParticipantId) {
-                    const otherUser = Array.from(onlineUsers.values()).find(u => u.id === otherParticipantId);
+                    const otherUser = allUsers.get(otherParticipantId);
                     if (otherUser) {
                         displayName = otherUser.nick;
                     } else {
-                        // Если пользователь не онлайн, извлекаем из названия
                         displayName = chat.name.replace('Личный чат с ', '');
                     }
                 }
@@ -334,37 +328,50 @@ function updateChatHeaderTitle(chat) {
     }
 }
 
-// Обновление списка онлайн пользователей
-function updateOnlineUsersList() {
+function updateUsersLists() {
     onlineUsersList.innerHTML = '';
-    const sortedUsers = Array.from(onlineUsers.values()).sort((a, b) => a.nick.localeCompare(b.nick));
-    let hasUsers = false;
+    offlineUsersList.innerHTML = '';
+    
+    const sortedUsers = Array.from(allUsers.values()).sort((a, b) => a.nick.localeCompare(b.nick));
+    let hasOnline = false;
+    let hasOffline = false;
     
     sortedUsers.forEach(user => {
-        if (user.nick !== currentUser?.nick) {
-            hasUsers = true;
+        if (user.id !== currentUser?.id) {
             const div = document.createElement('div');
-            div.className = 'user-item';
+            div.className = `user-item ${user.online ? 'online' : 'offline'}`;
             div.textContent = user.nick;
             div.style.cursor = 'pointer';
-            div.title = 'Нажмите для создания личного чата';
+            div.title = user.online ? 'Нажмите для создания личного чата' : `Был(а) в сети: ${new Date(user.lastSeen).toLocaleString()}`;
             div.onclick = () => {
-                console.log('Clicked on user:', user);
                 createPrivateChat(user);
             };
-            onlineUsersList.appendChild(div);
+            
+            if (user.online) {
+                hasOnline = true;
+                onlineUsersList.appendChild(div);
+            } else {
+                hasOffline = true;
+                offlineUsersList.appendChild(div);
+            }
         }
     });
     
-    if (!hasUsers) {
+    if (!hasOnline) {
         const emptyDiv = document.createElement('div');
         emptyDiv.className = 'empty-message';
-        emptyDiv.textContent = 'Нет других пользователей онлайн';
+        emptyDiv.textContent = 'Нет пользователей онлайн';
         onlineUsersList.appendChild(emptyDiv);
+    }
+    
+    if (!hasOffline) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'empty-message';
+        emptyDiv.textContent = 'Нет пользователей оффлайн';
+        offlineUsersList.appendChild(emptyDiv);
     }
 }
 
-// Рендер списка чатов
 function renderChatsList() {
     chatsList.innerHTML = '';
     
@@ -412,18 +419,15 @@ function renderChatsList() {
             preview = lastMessage.text.length > 30 ? lastMessage.text.substring(0, 30) + '...' : lastMessage.text;
         }
         
-        // Формируем отображаемое название чата
         let displayName = chat.name;
         if (chat.isPrivate && currentUser) {
-            // Для личных чатов показываем имя собеседника
             if (chat.participants && chat.participants.length === 2) {
                 const otherParticipantId = chat.participants.find(id => id !== currentUser.id);
                 if (otherParticipantId) {
-                    const otherUser = Array.from(onlineUsers.values()).find(u => u.id === otherParticipantId);
+                    const otherUser = allUsers.get(otherParticipantId);
                     if (otherUser) {
                         displayName = otherUser.nick;
                     } else {
-                        // Если пользователь не онлайн, извлекаем из названия
                         displayName = chat.name.replace('Личный чат с ', '');
                     }
                 }
@@ -441,7 +445,6 @@ function renderChatsList() {
     });
 }
 
-// Открытие чата
 function openChat(chatId) {
     const chat = chats.get(chatId);
     if (chat) {
@@ -458,7 +461,6 @@ function openChat(chatId) {
     }
 }
 
-// Рендер сообщений
 function renderMessages(chat) {
     if (!messagesContainer) return;
     messagesContainer.innerHTML = '';
@@ -478,7 +480,6 @@ function renderMessages(chat) {
     });
 }
 
-// Добавление системного сообщения
 function addSystemMessage(text) {
     const messageDiv = document.createElement('div');
     messageDiv.className = 'message other';
@@ -490,21 +491,18 @@ function addSystemMessage(text) {
     scrollToBottom();
 }
 
-// Скролл вниз
 function scrollToBottom() {
     if (messagesContainer) {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 }
 
-// Эскейп HTML
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-// Обновление заголовка страницы
 function updatePageTitle() {
     let totalUnread = 0;
     for (let count of unreadMessages.values()) {
@@ -512,9 +510,9 @@ function updatePageTitle() {
     }
     
     if (totalUnread > 0) {
-        document.title = `(${totalUnread}) Dark Messenger`;
+        document.title = `(${totalUnread}) Fembo`;
     } else {
-        document.title = 'Dark Messenger';
+        document.title = 'Fembo';
     }
 }
 
@@ -549,13 +547,13 @@ if (newChatBtn) {
     newChatBtn.onclick = () => {
         chatNameInput.value = '';
         participantsList.innerHTML = '';
-        const onlineUsersArray = Array.from(onlineUsers.values());
-        const otherUsers = onlineUsersArray.filter(u => u.nick !== currentUser.nick);
+        const allUsersArray = Array.from(allUsers.values());
+        const otherUsers = allUsersArray.filter(u => u.id !== currentUser.id);
         
         if (otherUsers.length === 0) {
             const emptyDiv = document.createElement('div');
             emptyDiv.className = 'empty-message';
-            emptyDiv.textContent = 'Нет других пользователей онлайн для создания группового чата';
+            emptyDiv.textContent = 'Нет других пользователей для создания группового чата';
             participantsList.appendChild(emptyDiv);
         } else {
             otherUsers.forEach(user => {
@@ -563,7 +561,7 @@ if (newChatBtn) {
                 div.className = 'participant-checkbox';
                 div.innerHTML = `
                     <input type="checkbox" value="${escapeHtml(user.nick)}" id="user_${escapeHtml(user.nick)}">
-                    <label for="user_${escapeHtml(user.nick)}">${escapeHtml(user.nick)}</label>
+                    <label for="user_${escapeHtml(user.nick)}">${escapeHtml(user.nick)} ${user.online ? '🟢' : '⚫'}</label>
                 `;
                 participantsList.appendChild(div);
             });
@@ -636,4 +634,4 @@ document.addEventListener('click', (e) => {
     }
 });
 
-console.log('App initialized');
+console.log('Fembo Messenger initialized');

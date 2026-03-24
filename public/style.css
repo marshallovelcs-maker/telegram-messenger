@@ -34,6 +34,26 @@ body {
     align-items: center;
 }
 
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fox-icon {
+    font-size: 24px;
+    animation: bounce 2s ease-in-out infinite;
+}
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-3px);
+    }
+}
+
 .sidebar-header h2 {
     font-size: 20px;
     font-weight: 600;
@@ -138,12 +158,12 @@ body {
     background: #2a2a2a;
 }
 
-.online-users {
+.online-users, .offline-users {
     padding: 15px;
     border-bottom: 1px solid #2a2a2a;
 }
 
-.online-users h3 {
+.online-users h3, .offline-users h3 {
     font-size: 12px;
     text-transform: uppercase;
     color: #888;
@@ -152,7 +172,7 @@ body {
 }
 
 .users-list {
-    max-height: 200px;
+    max-height: 150px;
     overflow-y: auto;
 }
 
@@ -172,9 +192,16 @@ body {
     padding-left: 8px;
 }
 
-.user-item::before {
+.user-item.online::before {
     content: "●";
     color: #4caf50;
+    margin-right: 8px;
+    font-size: 10px;
+}
+
+.user-item.offline::before {
+    content: "○";
+    color: #666;
     margin-right: 8px;
     font-size: 10px;
 }
