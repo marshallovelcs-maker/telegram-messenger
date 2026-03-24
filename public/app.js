@@ -4,7 +4,7 @@ const socket = io();
 let currentUser = null;
 let currentChat = null;
 let chats = new Map();
-let onlineUsers = new Map(); // Изменяем Set на Map (nick -> user data)
+let onlineUsers = new Map();
 let unreadMessages = new Map();
 let newChats = new Set();
 
@@ -34,8 +34,33 @@ const participantsList = document.getElementById('participantsList');
 const createChatBtn = document.getElementById('createChatBtn');
 const cancelChatBtn = document.getElementById('cancelChatBtn');
 
-// Registration
-let userNick = prompt('Введите ваш ник:', 'User' + Math.floor(Math.random() * 1000));
+// Функции для работы с localStorage
+function saveUserNick(nick) {
+    localStorage.setItem('messenger_user_nick', nick);
+}
+
+function getSavedNick() {
+    return localStorage.getItem('messenger_user_nick');
+}
+
+// Registration - проверяем сохраненный ник
+let userNick = getSavedNick();
+if (!userNick) {
+    userNick = prompt('Введите ваш ник:', 'User' + Math.floor(Math.random() * 1000));
+    if (userNick) {
+        saveUserNick(userNick);
+    }
+} else {
+    // Спрашиваем, хочет ли пользователь использовать сохраненный ник
+    const useSaved = confirm(`Использовать сохраненный ник "${userNick}"?`);
+    if (!useSaved) {
+        userNick = prompt('Введите новый ник:', userNick);
+        if (userNick) {
+            saveUserNick(userNick);
+        }
+    }
+}
+
 if (userNick) {
     socket.emit('register', userNick);
 }
@@ -52,7 +77,6 @@ socket.on('initial_data', (data) => {
         }
     });
     
-    // Сохраняем пользователей с их ID
     data.onlineUsers.forEach(user => {
         onlineUsers.set(user.nick, user);
     });
@@ -63,8 +87,11 @@ socket.on('initial_data', (data) => {
 
 socket.on('registration_error', (error) => {
     alert(error);
+    // Очищаем сохраненный ник при ошибке
+    localStorage.removeItem('messenger_user_nick');
     const newNick = prompt('Введите другой ник:');
     if (newNick) {
+        saveUserNick(newNick);
         socket.emit('register', newNick);
     }
 });
@@ -72,20 +99,29 @@ socket.on('registration_error', (error) => {
 socket.on('user_online', (user) => {
     onlineUsers.set(user.nick, user);
     updateOnlineUsersList();
+    // Обновляем отображение чатов (для обновления имен)
+    renderChatsList();
+    if (currentChat) {
+        updateChatHeaderTitle(currentChat);
+    }
 });
 
 socket.on('user_offline', (user) => {
     onlineUsers.delete(user.nick);
     updateOnlineUsersList();
+    renderChatsList();
+    if (currentChat) {
+        updateChatHeaderTitle(currentChat);
+    }
 });
 
 socket.on('nick_changed', (data) => {
     if (currentUser && data.id === currentUser.id) {
         currentUser.nick = data.newNick;
         currentNickSpan.textContent = data.newNick;
+        saveUserNick(data.newNick);
     }
     
-    // Обновляем ник в списке пользователей
     const userData = onlineUsers.get(data.oldNick);
     if (userData) {
         onlineUsers.delete(data.oldNick);
@@ -100,16 +136,25 @@ socket.on('nick_changed', (data) => {
                 msg.sender = data.newNick;
             }
         });
+        
+        // Обновляем название личного чата если нужно
+        if (chat.isPrivate && chat.name.includes(data.oldNick)) {
+            chat.name = chat.name.replace(data.oldNick, data.newNick);
+        }
     });
+    
+    renderChatsList();
     
     if (currentChat) {
         renderMessages(currentChat);
+        updateChatHeaderTitle(currentChat);
     }
 });
 
 socket.on('nick_changed_success', (data) => {
     currentUser.nick = data.newNick;
     currentNickSpan.textContent = data.newNick;
+    saveUserNick(data.newNick);
 });
 
 socket.on('nick_error', (error) => {
@@ -228,6 +273,7 @@ function createPrivateChat(user) {
         console.log('Existing chat found:', existingChat);
         openChat(existingChat.id);
     } else {
+        // Название чата всегда "Личный чат с [ник собеседника]"
         const chatName = `Личный чат с ${user.nick}`;
         console.log('Creating new private chat:', chatName, user.id);
         socket.emit('create_private_chat', chatName, user.id);
@@ -261,6 +307,30 @@ function playNotificationSound() {
         audio.play().catch(e => console.log('Audio play failed:', e));
     } catch(e) {
         console.log('Sound not supported');
+    }
+}
+
+// Обновление заголовка чата
+function updateChatHeaderTitle(chat) {
+    const chatHeaderH3 = chatHeader.querySelector('h3');
+    if (chatHeaderH3) {
+        let displayName = chat.name;
+        if (chat.isPrivate && currentUser) {
+            // Для личных чатов показываем имя собеседника
+            if (chat.participants && chat.participants.length === 2) {
+                const otherParticipantId = chat.participants.find(id => id !== currentUser.id);
+                if (otherParticipantId) {
+                    const otherUser = Array.from(onlineUsers.values()).find(u => u.id === otherParticipantId);
+                    if (otherUser) {
+                        displayName = otherUser.nick;
+                    } else {
+                        // Если пользователь не онлайн, извлекаем из названия
+                        displayName = chat.name.replace('Личный чат с ', '');
+                    }
+                }
+            }
+        }
+        chatHeaderH3.textContent = displayName;
     }
 }
 
@@ -342,6 +412,7 @@ function renderChatsList() {
             preview = lastMessage.text.length > 30 ? lastMessage.text.substring(0, 30) + '...' : lastMessage.text;
         }
         
+        // Формируем отображаемое название чата
         let displayName = chat.name;
         if (chat.isPrivate && currentUser) {
             // Для личных чатов показываем имя собеседника
@@ -352,7 +423,7 @@ function renderChatsList() {
                     if (otherUser) {
                         displayName = otherUser.nick;
                     } else {
-                        // Если пользователь не онлайн, пытаемся извлечь из названия
+                        // Если пользователь не онлайн, извлекаем из названия
                         displayName = chat.name.replace('Личный чат с ', '');
                     }
                 }
@@ -375,22 +446,7 @@ function openChat(chatId) {
     const chat = chats.get(chatId);
     if (chat) {
         currentChat = chat;
-        const chatHeaderH3 = chatHeader.querySelector('h3');
-        if (chatHeaderH3) {
-            let displayName = chat.name;
-            if (chat.isPrivate && currentUser) {
-                if (chat.participants && chat.participants.length === 2) {
-                    const otherParticipantId = chat.participants.find(id => id !== currentUser.id);
-                    if (otherParticipantId) {
-                        const otherUser = Array.from(onlineUsers.values()).find(u => u.id === otherParticipantId);
-                        if (otherUser) {
-                            displayName = otherUser.nick;
-                        }
-                    }
-                }
-            }
-            chatHeaderH3.textContent = displayName;
-        }
+        updateChatHeaderTitle(chat);
         deleteChatBtn.style.display = 'block';
         messageInputContainer.style.display = 'flex';
         renderMessages(chat);
@@ -476,6 +532,7 @@ if (confirmNickBtn) {
     confirmNickBtn.onclick = () => {
         const newNick = newNickInput.value.trim();
         if (newNick && newNick !== currentUser.nick) {
+            saveUserNick(newNick);
             socket.emit('change_nick', newNick);
         }
         nickModal.classList.remove('active');

@@ -17,7 +17,6 @@ body {
     width: 100vw;
 }
 
-/* Sidebar styles */
 .sidebar {
     width: 320px;
     background: #0f0f0f;
@@ -237,7 +236,6 @@ body {
     color: #888;
 }
 
-/* Индикация нового чата */
 .chat-item.new-chat {
     animation: blink 1s ease-in-out 3;
     background: #1a2a3a;
@@ -253,7 +251,6 @@ body {
     }
 }
 
-/* Индикация непрочитанных сообщений */
 .chat-item.unread .chat-name {
     font-weight: bold;
     color: #4a9eff;
@@ -273,7 +270,6 @@ body {
     text-align: center;
 }
 
-/* Chat area styles */
 .chat-area {
     flex: 1;
     display: flex;
@@ -416,7 +412,6 @@ body {
     color: white;
 }
 
-/* Modal styles */
 .modal {
     display: none;
     position: fixed;
@@ -519,7 +514,6 @@ body {
     font-size: 14px;
 }
 
-/* Scrollbar styles */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
