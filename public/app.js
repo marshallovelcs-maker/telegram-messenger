@@ -4,7 +4,7 @@ const socket = io();
 let currentUser = null;
 let currentChat = null;
 let chats = new Map();
-let allUsers = new Map(); // id -> { nick, online, lastSeen }
+let allUsers = new Map();
 let unreadMessages = new Map();
 let newChats = new Set();
 
@@ -77,13 +77,20 @@ socket.on('initial_data', (data) => {
         }
     });
     
-    // Сохраняем всех пользователей (онлайн и оффлайн)
+    // Сохраняем всех пользователей
     data.allUsers.forEach(user => {
         allUsers.set(user.id, user);
     });
     
     updateUsersLists();
     renderChatsList();
+    
+    console.log('Initial data loaded:', {
+        currentUser: currentUser,
+        totalUsers: allUsers.size,
+        onlineUsers: Array.from(allUsers.values()).filter(u => u.online).length,
+        chats: chats.size
+    });
 });
 
 socket.on('registration_error', (error) => {
@@ -103,7 +110,7 @@ socket.on('user_online', (user) => {
         existingUser.lastSeen = new Date();
         allUsers.set(user.id, existingUser);
     } else {
-        allUsers.set(user.id, { ...user, online: true, lastSeen: new Date() });
+        allUsers.set(user.id, { ...user, online: true, lastSeen: new Date(), chats: [] });
     }
     updateUsersLists();
     renderChatsList();
@@ -192,6 +199,7 @@ socket.on('search_results', (results) => {
 });
 
 socket.on('new_chat', (chat) => {
+    console.log('New chat received:', chat);
     chats.set(chat.id, chat);
     unreadMessages.set(chat.id, 0);
     newChats.add(chat.id);
@@ -200,6 +208,7 @@ socket.on('new_chat', (chat) => {
 });
 
 socket.on('chat_created', (chat) => {
+    console.log('Chat created:', chat);
     newChatModal.classList.remove('active');
 });
 
