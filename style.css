@@ -39,19 +39,19 @@ body {
     position: relative;
 }
 
-/* Кнопка для показа/скрытия боковой панели на мобильных */
+/* Кнопка для показа/скрытия боковой панели на мобильных - перемещена в верхний левый угол */
 .mobile-menu-btn {
     display: none;
     position: fixed;
-    bottom: 80px;
-    right: 20px;
-    width: 50px;
-    height: 50px;
+    top: 10px;
+    left: 10px;
+    width: 45px;
+    height: 45px;
     background: #4a9eff;
     border: none;
     border-radius: 50%;
     color: white;
-    font-size: 24px;
+    font-size: 22px;
     cursor: pointer;
     z-index: 1000;
     box-shadow: 0 2px 10px rgba(0,0,0,0.3);
@@ -70,8 +70,8 @@ body {
     position: fixed;
     top: 10px;
     left: 10px;
-    width: 40px;
-    height: 40px;
+    width: 45px;
+    height: 45px;
     background: #2a2a2a;
     border: none;
     border-radius: 50%;
@@ -111,22 +111,24 @@ body {
     
     .mobile-menu-btn {
         display: flex;
-        bottom: 80px;
-        right: 20px;
+        top: 10px;
+        left: 10px;
     }
     
     .mobile-back-btn {
         display: flex;
+        top: 10px;
+        left: 10px;
     }
     
     .chat-header {
-        padding: 15px;
+        padding: 12px 15px;
+        padding-left: 65px;
     }
     
     .chat-header h3 {
         font-size: 16px;
-        margin-left: 45px;
-        margin-right: 45px;
+        margin: 0;
         text-align: center;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -136,11 +138,12 @@ body {
     .delete-chat-btn {
         padding: 4px 8px;
         font-size: 11px;
+        margin-left: auto;
     }
     
     .messages-container {
         padding: 15px;
-        padding-bottom: 80px;
+        padding-bottom: 75px;
     }
     
     .message {
@@ -161,7 +164,7 @@ body {
     }
     
     .message-input-container {
-        padding: 12px;
+        padding: 10px 12px;
         position: fixed;
         bottom: 0;
         left: 0;
@@ -176,8 +179,8 @@ body {
     }
     
     .image-upload-btn {
-        width: 36px;
-        height: 36px;
+        width: 40px;
+        height: 40px;
         font-size: 18px;
     }
     
@@ -188,7 +191,7 @@ body {
     
     #sendMessageBtn {
         padding: 0 16px;
-        height: 36px;
+        height: 40px;
         font-size: 13px;
     }
     
@@ -296,26 +299,20 @@ body {
         max-width: 90%;
     }
     
-    .chat-header h3 {
-        font-size: 14px;
-        margin-left: 40px;
-        margin-right: 40px;
+    .chat-header {
+        padding-left: 60px;
     }
     
-    .mobile-back-btn {
-        width: 35px;
-        height: 35px;
+    .chat-header h3 {
+        font-size: 14px;
+    }
+    
+    .mobile-menu-btn, .mobile-back-btn {
+        width: 40px;
+        height: 40px;
         font-size: 18px;
         top: 8px;
         left: 8px;
-    }
-    
-    .mobile-menu-btn {
-        width: 45px;
-        height: 45px;
-        font-size: 22px;
-        bottom: 75px;
-        right: 15px;
     }
     
     .message-image {
@@ -328,11 +325,23 @@ body {
     }
     
     .message-input-container {
-        padding: 10px;
+        padding: 8px 12px;
+    }
+    
+    .image-upload-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+    
+    #sendMessageBtn {
+        padding: 0 12px;
+        height: 36px;
+        font-size: 12px;
     }
     
     .messages-container {
-        padding-bottom: 75px;
+        padding-bottom: 70px;
     }
 }
 
