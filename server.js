@@ -24,6 +24,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 let users = new Map();
 let allUsers = new Map();
 let chats = new Map();
+let userUnreadCounts = new Map(); // userId -> Map(chatId -> unreadCount)
 
 // ID общего чата
 const GENERAL_CHAT_ID = 'general_chat';
@@ -46,6 +47,32 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
+
+// Функция для добавления непрочитанного сообщения
+function addUnreadMessage(userId, chatId) {
+  if (!userUnreadCounts.has(userId)) {
+    userUnreadCounts.set(userId, new Map());
+  }
+  const userUnreads = userUnreadCounts.get(userId);
+  const currentCount = userUnreads.get(chatId) || 0;
+  userUnreads.set(chatId, currentCount + 1);
+}
+
+// Функция для получения непрочитанных сообщений
+function getUnreadMessages(userId) {
+  if (!userUnreadCounts.has(userId)) {
+    return new Map();
+  }
+  return userUnreadCounts.get(userId);
+}
+
+// Функция для очистки непрочитанных
+function clearUnreadMessages(userId, chatId) {
+  if (userUnreadCounts.has(userId)) {
+    const userUnreads = userUnreadCounts.get(userId);
+    userUnreads.set(chatId, 0);
+  }
+}
 
 // Socket.IO обработчики
 io.on('connection', (socket) => {
@@ -108,8 +135,10 @@ io.on('connection', (socket) => {
     }
     socket.join(GENERAL_CHAT_ID);
     
-    // Формируем список чатов пользователя
+    // Формируем список чатов пользователя с непрочитанными сообщениями
     const userChats = [];
+    const userUnreads = getUnreadMessages(userData.id);
+    
     for (let chatId of userData.chats) {
       const chat = chats.get(chatId);
       if (chat) {
@@ -118,7 +147,8 @@ io.on('connection', (socket) => {
           name: chat.name,
           messages: chat.messages,
           isPrivate: chat.isPrivate,
-          participants: chat.participants
+          participants: chat.participants,
+          unreadCount: userUnreads.get(chatId) || 0
         });
       }
     }
@@ -134,7 +164,7 @@ io.on('connection', (socket) => {
       });
     }
     
-    // Отправляем начальные данные
+    // Отправляем начальные данные с непрочитанными сообщениями
     socket.emit('initial_data', {
       user: { nick: nick, id: userData.id },
       chats: userChats,
@@ -146,6 +176,7 @@ io.on('connection', (socket) => {
     
     console.log(`✅ User online: ${nick} (${userData.id})`);
     console.log(`📊 Total users: ${allUsers.size}, Online: ${users.size}`);
+    console.log(`📨 Unread messages for ${nick}:`, Array.from(userUnreads.entries()));
   });
   
   socket.on('create_private_chat', (chatName, targetUserId) => {
@@ -195,7 +226,8 @@ io.on('connection', (socket) => {
       name: chatName,
       messages: [],
       isPrivate: true,
-      participants: [creator.id, targetUser.id]
+      participants: [creator.id, targetUser.id],
+      unreadCount: 0
     });
     
     // Отправляем целевому пользователю
@@ -206,7 +238,8 @@ io.on('connection', (socket) => {
         name: chatName,
         messages: [],
         isPrivate: true,
-        participants: [creator.id, targetUser.id]
+        participants: [creator.id, targetUser.id],
+        unreadCount: 0
       });
       targetSocket.join(chatId);
     }
@@ -256,7 +289,8 @@ io.on('connection', (socket) => {
             name: chatName,
             messages: [],
             isPrivate: false,
-            participants: participants
+            participants: participants,
+            unreadCount: 0
           });
         }
       }
@@ -321,7 +355,8 @@ io.on('connection', (socket) => {
         name: chat.name, 
         messages: chat.messages,
         isPrivate: chat.isPrivate,
-        participants: chat.participants
+        participants: chat.participants,
+        unreadCount: 0
       });
       io.to(chatId).emit('user_joined', { nick: user.nick, chatId: chatId });
     }
@@ -344,6 +379,10 @@ io.on('connection', (socket) => {
         }
       });
       chats.delete(chatId);
+      // Удаляем счетчики непрочитанных для этого чата
+      if (userUnreadCounts.has(user.id)) {
+        userUnreadCounts.get(user.id).delete(chatId);
+      }
       socket.emit('chat_deleted_success', chatId);
       console.log(`🗑️ Chat deleted: ${chat.name}`);
     }
@@ -368,15 +407,29 @@ io.on('connection', (socket) => {
       // Отправляем сообщение всем участникам чата
       chat.participants.forEach(participantId => {
         const participantSocket = io.sockets.sockets.get(participantId);
+        
         if (participantSocket) {
+          // Если участник онлайн, отправляем сообщение сразу
           participantSocket.emit('new_message', {
             chatId: chatId,
             message: messageObj
           });
+        } else {
+          // Если участник оффлайн, добавляем в непрочитанные
+          addUnreadMessage(participantId, chatId);
+          console.log(`📨 Added unread message for offline user ${participantId} in chat ${chatId}`);
         }
       });
       
       console.log(`💬 ${chat.name}: ${user.nick}: ${message.substring(0, 50)}`);
+    }
+  });
+  
+  socket.on('mark_read', (chatId) => {
+    const user = users.get(socket.id);
+    if (user) {
+      clearUnreadMessages(user.id, chatId);
+      console.log(`✅ Marked chat ${chatId} as read for ${user.nick}`);
     }
   });
   

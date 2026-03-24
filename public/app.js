@@ -82,14 +82,14 @@ socket.on('initial_data', (data) => {
     unreadMessages.clear();
     newChats.clear();
     
-    // Load chats
+    // Load chats with unread counts
     if (data.chats && data.chats.length > 0) {
         data.chats.forEach(chat => {
             chats.set(chat.id, chat);
-            // Сохраняем счетчик непрочитанных сообщений для оффлайн периода
-            if (!unreadMessages.has(chat.id)) {
-                unreadMessages.set(chat.id, 0);
-            }
+            // Сохраняем счетчик непрочитанных сообщений
+            const unreadCount = chat.unreadCount || 0;
+            unreadMessages.set(chat.id, unreadCount);
+            console.log(`Chat ${chat.name}: ${unreadCount} unread messages`);
         });
         console.log(`Loaded ${chats.size} chats`);
     }
@@ -104,6 +104,24 @@ socket.on('initial_data', (data) => {
     
     updateUsersLists();
     renderChatsList();
+    
+    // Показываем уведомление о непрочитанных сообщениях
+    let totalUnread = 0;
+    for (let count of unreadMessages.values()) {
+        totalUnread += count;
+    }
+    if (totalUnread > 0) {
+        console.log(`📨 You have ${totalUnread} unread messages`);
+        // Можем показать всплывающее уведомление
+        if (Notification.permission === 'granted') {
+            new Notification(`Fembo`, {
+                body: `У вас ${totalUnread} непрочитанных сообщений`,
+                icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="45" fill="%234a9eff"/%3E%3C/svg%3E'
+            });
+        } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission();
+        }
+    }
     
     // Автоматически открываем общий чат
     const generalChat = Array.from(chats.values()).find(chat => chat.id === 'general_chat');
@@ -219,7 +237,7 @@ socket.on('search_results', (results) => {
 
 socket.on('new_chat', (chat) => {
     chats.set(chat.id, chat);
-    unreadMessages.set(chat.id, 0);
+    unreadMessages.set(chat.id, chat.unreadCount || 0);
     newChats.add(chat.id);
     renderChatsList();
     playNotificationSound();
@@ -234,7 +252,6 @@ socket.on('chat_exists', (chat) => {
 });
 
 socket.on('open_chat', (chat) => {
-    // Сразу открываем созданный чат
     const existingChat = chats.get(chat.id);
     if (existingChat) {
         openChat(chat.id);
@@ -283,6 +300,9 @@ socket.on('new_message', (data) => {
             unreadMessages.set(data.chatId, currentCount + 1);
             renderChatsList();
             playNotificationSound();
+            
+            // Обновляем заголовок страницы
+            updatePageTitle();
         }
         
         // Если чат открыт, показываем сообщение сразу и сбрасываем счетчик
@@ -291,6 +311,8 @@ socket.on('new_message', (data) => {
             scrollToBottom();
             unreadMessages.set(data.chatId, 0);
             renderChatsList();
+            // Отправляем на сервер, что сообщения прочитаны
+            socket.emit('mark_read', data.chatId);
         }
     }
 });
@@ -310,10 +332,8 @@ function createPrivateChat(user) {
     }
     
     if (existingChat) {
-        // Если чат существует, сразу открываем его
         openChat(existingChat.id);
     } else {
-        // Создаем новый личный чат
         const chatName = `Личный чат с ${user.nick}`;
         socket.emit('create_private_chat', chatName, user.id);
     }
@@ -487,7 +507,13 @@ function openChat(chatId) {
         scrollToBottom();
         
         // Сбрасываем счетчик непрочитанных при открытии чата
-        unreadMessages.set(chatId, 0);
+        if (unreadMessages.get(chatId) > 0) {
+            unreadMessages.set(chatId, 0);
+            socket.emit('mark_read', chatId);
+            renderChatsList();
+            updatePageTitle();
+        }
+        
         newChats.delete(chatId);
         renderChatsList();
     }
