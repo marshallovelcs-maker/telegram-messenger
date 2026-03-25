@@ -285,26 +285,31 @@ socket.on('chat_deleted', (chatId) => {
 
 socket.on('chat_deleted_success', (chatId) => {});
 
+// Обработчик получения сообщений от других
 socket.on('new_message', (data) => {
     const chat = chats.get(data.chatId);
     if (chat) {
-        chat.messages.push(data.message);
-        
-        if (data.message.sender !== currentUser.nick && 
-            (!currentChat || currentChat.id !== data.chatId)) {
-            const currentCount = unreadMessages.get(data.chatId) || 0;
-            unreadMessages.set(data.chatId, currentCount + 1);
-            renderChatsList();
-            playNotificationSound();
-            updatePageTitle();
-        }
-        
-        if (currentChat && currentChat.id === data.chatId) {
-            renderMessages(chat);
-            scrollToBottom();
-            unreadMessages.set(data.chatId, 0);
-            renderChatsList();
-            socket.emit('mark_read', data.chatId);
+        // Проверяем, не дублируется ли сообщение (по id)
+        const exists = chat.messages.some(msg => msg.id === data.message.id);
+        if (!exists) {
+            chat.messages.push(data.message);
+            
+            if (data.message.sender !== currentUser.nick && 
+                (!currentChat || currentChat.id !== data.chatId)) {
+                const currentCount = unreadMessages.get(data.chatId) || 0;
+                unreadMessages.set(data.chatId, currentCount + 1);
+                renderChatsList();
+                playNotificationSound();
+                updatePageTitle();
+            }
+            
+            if (currentChat && currentChat.id === data.chatId) {
+                renderMessages(chat);
+                scrollToBottom();
+                unreadMessages.set(data.chatId, 0);
+                renderChatsList();
+                socket.emit('mark_read', data.chatId);
+            }
         }
     }
 });
@@ -631,13 +636,35 @@ if (cancelChatBtn) {
     };
 }
 
+// ОТПРАВКА СООБЩЕНИЯ - СРАЗУ ДОБАВЛЯЕМ В ЧАТ
 if (sendMessageBtn) {
     sendMessageBtn.onclick = () => {
         if (currentChat && messageInput.value.trim()) {
+            const messageText = messageInput.value.trim();
+            const messageObj = {
+                id: Date.now().toString(),
+                type: 'text',
+                text: messageText,
+                sender: currentUser.nick,
+                senderId: currentUser.id,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Сразу добавляем сообщение в локальный чат
+            const chat = chats.get(currentChat.id);
+            if (chat) {
+                chat.messages.push(messageObj);
+                renderMessages(chat);
+                scrollToBottom();
+                renderChatsList();
+            }
+            
+            // Отправляем на сервер
             socket.emit('send_message', {
                 chatId: currentChat.id,
-                message: messageInput.value.trim()
+                message: messageText
             });
+            
             messageInput.value = '';
             messageInput.style.height = 'auto';
         }
