@@ -12,6 +12,7 @@ let chats = new Map();
 let allUsers = new Map();
 let unreadMessages = new Map();
 let newChats = new Set();
+let sentMessageIds = new Set(); // Храним ID отправленных сообщений
 
 // DOM elements
 const currentNickSpan = document.getElementById('currentNick');
@@ -81,6 +82,7 @@ socket.on('initial_data', (data) => {
     allUsers.clear();
     unreadMessages.clear();
     newChats.clear();
+    sentMessageIds.clear();
     
     // Load chats with unread counts
     if (data.chats && data.chats.length > 0) {
@@ -285,12 +287,23 @@ socket.on('chat_deleted', (chatId) => {
 
 socket.on('chat_deleted_success', (chatId) => {});
 
-// Обработчик получения сообщений от других
+// Обработчик получения сообщений от других (и от себя, но с проверкой дубликатов)
 socket.on('new_message', (data) => {
     const chat = chats.get(data.chatId);
     if (chat) {
         // Проверяем, не дублируется ли сообщение (по id)
         const exists = chat.messages.some(msg => msg.id === data.message.id);
+        
+        // Также проверяем, не отправляли ли мы это сообщение сами (по id в sentMessageIds)
+        const isOwnMessage = data.message.sender === currentUser.nick;
+        const alreadySent = sentMessageIds.has(data.message.id);
+        
+        // Если это наше сообщение и мы его уже добавили локально - пропускаем
+        if (isOwnMessage && alreadySent) {
+            console.log('Skipping duplicate own message:', data.message.id);
+            return;
+        }
+        
         if (!exists) {
             chat.messages.push(data.message);
             
@@ -636,19 +649,23 @@ if (cancelChatBtn) {
     };
 }
 
-// ОТПРАВКА СООБЩЕНИЯ - СРАЗУ ДОБАВЛЯЕМ В ЧАТ
+// ОТПРАВКА СООБЩЕНИЯ - СРАЗУ ДОБАВЛЯЕМ В ЧАТ И ЗАПОМИНАЕМ ID
 if (sendMessageBtn) {
     sendMessageBtn.onclick = () => {
         if (currentChat && messageInput.value.trim()) {
             const messageText = messageInput.value.trim();
+            const messageId = Date.now().toString();
             const messageObj = {
-                id: Date.now().toString(),
+                id: messageId,
                 type: 'text',
                 text: messageText,
                 sender: currentUser.nick,
                 senderId: currentUser.id,
                 timestamp: new Date().toISOString()
             };
+            
+            // Запоминаем ID отправленного сообщения
+            sentMessageIds.add(messageId);
             
             // Сразу добавляем сообщение в локальный чат
             const chat = chats.get(currentChat.id);
@@ -667,6 +684,11 @@ if (sendMessageBtn) {
             
             messageInput.value = '';
             messageInput.style.height = 'auto';
+            
+            // Очищаем ID через 2 секунды (чтобы не накапливались)
+            setTimeout(() => {
+                sentMessageIds.delete(messageId);
+            }, 2000);
         }
     };
 }
