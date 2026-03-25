@@ -366,6 +366,7 @@ io.on('connection', (socket) => {
     }
   });
   
+  // ОТПРАВКА СООБЩЕНИЯ - НЕ ОТПРАВЛЯЕМ ОБРАТНО ОТПРАВИТЕЛЮ
   socket.on('send_message', (data) => {
     const { chatId, message } = data;
     const user = users.get(socket.id);
@@ -383,7 +384,11 @@ io.on('connection', (socket) => {
       
       chat.messages.push(messageObj);
       
+      // Отправляем сообщение ВСЕМ участникам, КРОМЕ отправителя
       chat.participants.forEach(participantId => {
+        // Пропускаем отправителя
+        if (participantId === user.id) return;
+        
         const participantSocket = io.sockets.sockets.get(participantId);
         
         if (participantSocket) {
