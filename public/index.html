@@ -2,10 +2,10 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Fembo Messenger</title>
     <link rel="stylesheet" href="/style.css">
-    <link rel="icon" type="image/png" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%234a9eff'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="icon" type="image/png" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%2300ffcc'/%3E%3Ccircle cx='35' cy='40' r='5' fill='%2303050b'/%3E%3Ccircle cx='65' cy='40' r='5' fill='%2303050b'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='%2303050b' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
 </head>
 <body>
     <div class="app">
@@ -14,7 +14,7 @@
             <div class="sidebar-header">
                 <div class="logo-container">
                     <div class="fox-icon">🦊</div>
-                    <h2>Fembo</h2>
+                    <h2>FEMBO</h2>
                 </div>
                 <button class="new-chat-btn" id="newChatBtn" title="Создать групповой чат">+</button>
             </div>
@@ -25,28 +25,28 @@
             </div>
             
             <div class="search-container">
-                <input type="text" id="searchInput" placeholder="Поиск по нику..." class="search-input">
+                <input type="text" id="searchInput" placeholder="> Поиск по нику..." class="search-input">
                 <div id="searchResults" class="search-results"></div>
             </div>
             
             <div class="online-users">
-                <h3>Онлайн пользователи</h3>
+                <h3>[ ONLINE ]</h3>
                 <div id="onlineUsersList" class="users-list">
-                    <div class="empty-message">Загрузка...</div>
+                    <div class="empty-message">Нет пользователей онлайн</div>
                 </div>
             </div>
             
             <div class="offline-users">
-                <h3>Оффлайн пользователи</h3>
+                <h3>[ OFFLINE ]</h3>
                 <div id="offlineUsersList" class="users-list">
-                    <div class="empty-message">Загрузка...</div>
+                    <div class="empty-message">Нет пользователей оффлайн</div>
                 </div>
             </div>
             
             <div class="chats-list">
-                <h3>Мои чаты</h3>
+                <h3>[ CHATS ]</h3>
                 <div id="chatsList" class="chats-container">
-                    <div class="empty-message">Загрузка...</div>
+                    <div class="empty-message">Нет чатов</div>
                 </div>
             </div>
         </aside>
@@ -54,21 +54,23 @@
         <!-- Основная область чата -->
         <main class="chat-area">
             <div class="chat-header" id="chatHeader">
-                <h3>Выберите чат</h3>
-                <button class="delete-chat-btn" id="deleteChatBtn" style="display: none;">🗑 Удалить чат</button>
+                <h3>SELECT CHAT</h3>
+                <button class="delete-chat-btn" id="deleteChatBtn" style="display: none;">DELETE</button>
             </div>
             
             <div class="messages-container" id="messagesContainer">
                 <div class="empty-chat-message">
-                    <p>🦊 Добро пожаловать в Fembo!</p>
-                    <p>Выберите чат из списка слева или создайте новый</p>
-                    <p>💡 Кликните по пользователю, чтобы начать личный диалог</p>
+                    <p>➤ ДОБРО ПОЖАЛОВАТЬ В FEMBO</p>
+                    <p>➤ ВЫБЕРИТЕ ЧАТ ИЗ СПИСКА</p>
+                    <p>➤ КЛИКНИТЕ ПО ПОЛЬЗОВАТЕЛЮ ДЛЯ ЛИЧНОГО ДИАЛОГА</p>
                 </div>
             </div>
             
             <div class="message-input-container" style="display: none;">
-                <textarea id="messageInput" placeholder="Введите сообщение..." rows="3"></textarea>
-                <button id="sendMessageBtn">Отправить</button>
+                <div class="input-actions">
+                    <textarea id="messageInput" placeholder="> Введите сообщение..." rows="3"></textarea>
+                    <button id="sendMessageBtn">SEND</button>
+                </div>
             </div>
         </main>
     </div>
@@ -76,11 +78,11 @@
     <!-- Модальное окно смены ника -->
     <div id="nickModal" class="modal">
         <div class="modal-content">
-            <h3>Сменить ник</h3>
-            <input type="text" id="newNickInput" placeholder="Введите новый ник" autocomplete="off">
+            <h3>CHANGE NICK</h3>
+            <input type="text" id="newNickInput" placeholder="> введите новый ник" autocomplete="off">
             <div class="modal-buttons">
-                <button id="confirmNickBtn">Подтвердить</button>
-                <button id="cancelNickBtn">Отмена</button>
+                <button id="confirmNickBtn">CONFIRM</button>
+                <button id="cancelNickBtn">CANCEL</button>
             </div>
         </div>
     </div>
@@ -88,15 +90,15 @@
     <!-- Модальное окно создания группового чата -->
     <div id="newChatModal" class="modal">
         <div class="modal-content">
-            <h3>Создать групповой чат</h3>
-            <input type="text" id="chatNameInput" placeholder="Название чата" autocomplete="off">
+            <h3>CREATE GROUP</h3>
+            <input type="text" id="chatNameInput" placeholder="> название чата" autocomplete="off">
             <div class="participants-select">
-                <h4>Выберите участников:</h4>
+                <h4>SELECT PARTICIPANTS:</h4>
                 <div id="participantsList"></div>
             </div>
             <div class="modal-buttons">
-                <button id="createChatBtn">Создать чат</button>
-                <button id="cancelChatBtn">Отмена</button>
+                <button id="createChatBtn">CREATE</button>
+                <button id="cancelChatBtn">CANCEL</button>
             </div>
         </div>
     </div>

@@ -24,7 +24,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 let users = new Map();
 let allUsers = new Map();
 let chats = new Map();
-let userUnreadCounts = new Map(); // userId -> Map(chatId -> unreadCount)
+let userUnreadCounts = new Map();
 
 // ID общего чата
 const GENERAL_CHAT_ID = 'general_chat';
@@ -81,7 +81,6 @@ io.on('connection', (socket) => {
   socket.on('register', (nick) => {
     console.log(`📝 Registering user: ${nick}`);
     
-    // Проверяем, есть ли уже пользователь с таким ником онлайн
     let existingOnline = false;
     for (let [id, user] of users) {
       if (user.nick === nick) {
@@ -95,7 +94,6 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Ищем пользователя в базе всех пользователей
     let userData = null;
     for (let [id, user] of allUsers) {
       if (user.nick === nick) {
@@ -104,7 +102,6 @@ io.on('connection', (socket) => {
       }
     }
     
-    // Если пользователь новый
     if (!userData) {
       userData = {
         id: socket.id,
@@ -115,7 +112,6 @@ io.on('connection', (socket) => {
       };
       allUsers.set(socket.id, userData);
     } else {
-      // Пользователь уже был, обновляем данные
       userData.online = true;
       userData.lastSeen = new Date();
       userData.socketId = socket.id;
@@ -125,17 +121,14 @@ io.on('connection', (socket) => {
       allUsers.set(userData.id, userData);
     }
     
-    // Сохраняем в активные пользователи
     users.set(socket.id, userData);
     
-    // Добавляем пользователя в общий чат
     const generalChat = chats.get(GENERAL_CHAT_ID);
     if (generalChat && !generalChat.participants.includes(userData.id)) {
       generalChat.participants.push(userData.id);
     }
     socket.join(GENERAL_CHAT_ID);
     
-    // Формируем список чатов пользователя с непрочитанными сообщениями
     const userChats = [];
     const userUnreads = getUnreadMessages(userData.id);
     
@@ -153,7 +146,6 @@ io.on('connection', (socket) => {
       }
     }
     
-    // Формируем список всех пользователей
     const allUsersList = [];
     for (let [id, user] of allUsers) {
       allUsersList.push({
@@ -164,31 +156,24 @@ io.on('connection', (socket) => {
       });
     }
     
-    // Отправляем начальные данные с непрочитанными сообщениями
     socket.emit('initial_data', {
       user: { nick: nick, id: userData.id },
       chats: userChats,
       allUsers: allUsersList
     });
     
-    // Уведомляем всех о новом/вернувшемся пользователе
     io.emit('user_online', { nick: nick, id: userData.id });
     
     console.log(`✅ User online: ${nick} (${userData.id})`);
     console.log(`📊 Total users: ${allUsers.size}, Online: ${users.size}`);
-    console.log(`📨 Unread messages for ${nick}:`, Array.from(userUnreads.entries()));
   });
   
   socket.on('create_private_chat', (chatName, targetUserId) => {
     const creator = users.get(socket.id);
     const targetUser = allUsers.get(targetUserId);
     
-    if (!creator || !targetUser) {
-      console.log(`❌ Cannot create private chat: creator or target not found`);
-      return;
-    }
+    if (!creator || !targetUser) return;
     
-    // Проверяем, существует ли уже личный чат
     let existingChat = null;
     for (let [chatId, chat] of chats) {
       if (chat.isPrivate && chat.participants && chat.participants.length === 2) {
@@ -214,13 +199,11 @@ io.on('connection', (socket) => {
       createdAt: new Date()
     };
     
-    // Добавляем чат в списки пользователей
     creator.chats.push(chatId);
     targetUser.chats.push(chatId);
     
     chats.set(chatId, newChat);
     
-    // Отправляем создателю
     socket.emit('new_chat', {
       id: chatId,
       name: chatName,
@@ -230,7 +213,6 @@ io.on('connection', (socket) => {
       unreadCount: 0
     });
     
-    // Отправляем целевому пользователю
     const targetSocket = io.sockets.sockets.get(targetUser.id);
     if (targetSocket) {
       targetSocket.emit('new_chat', {
@@ -245,8 +227,6 @@ io.on('connection', (socket) => {
     }
     
     socket.join(chatId);
-    
-    // Сразу открываем чат у создателя
     socket.emit('open_chat', { id: chatId, name: chatName, isPrivate: true });
     
     console.log(`💬 Private chat: ${chatName} between ${creator.nick} and ${targetUser.nick}`);
@@ -307,7 +287,6 @@ io.on('connection', (socket) => {
     const user = users.get(socket.id);
     if (!user) return;
     
-    // Проверяем, не занят ли новый ник
     let nickTaken = false;
     for (let [id, u] of allUsers) {
       if (u.nick === newNick && id !== user.id) {
@@ -379,7 +358,6 @@ io.on('connection', (socket) => {
         }
       });
       chats.delete(chatId);
-      // Удаляем счетчики непрочитанных для этого чата
       if (userUnreadCounts.has(user.id)) {
         userUnreadCounts.get(user.id).delete(chatId);
       }
@@ -396,6 +374,7 @@ io.on('connection', (socket) => {
     if (user && chat && message && message.trim()) {
       const messageObj = {
         id: Date.now().toString(),
+        type: 'text',
         text: message.trim(),
         sender: user.nick,
         senderId: user.id,
@@ -404,20 +383,16 @@ io.on('connection', (socket) => {
       
       chat.messages.push(messageObj);
       
-      // Отправляем сообщение всем участникам чата
       chat.participants.forEach(participantId => {
         const participantSocket = io.sockets.sockets.get(participantId);
         
         if (participantSocket) {
-          // Если участник онлайн, отправляем сообщение сразу
           participantSocket.emit('new_message', {
             chatId: chatId,
             message: messageObj
           });
         } else {
-          // Если участник оффлайн, добавляем в непрочитанные
           addUnreadMessage(participantId, chatId);
-          console.log(`📨 Added unread message for offline user ${participantId} in chat ${chatId}`);
         }
       });
       
@@ -455,9 +430,9 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`=================================`);
-  console.log(`🦊 Fembo Messenger Server Started`);
+  console.log(`🦊 FEMBO SERVER`);
   console.log(`=================================`);
-  console.log(`📡 Port: ${PORT}`);
+  console.log(`📡 PORT: ${PORT}`);
   console.log(`🌐 URL: http://localhost:${PORT}`);
   console.log(`=================================`);
 });

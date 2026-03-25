@@ -86,10 +86,8 @@ socket.on('initial_data', (data) => {
     if (data.chats && data.chats.length > 0) {
         data.chats.forEach(chat => {
             chats.set(chat.id, chat);
-            // Сохраняем счетчик непрочитанных сообщений
             const unreadCount = chat.unreadCount || 0;
             unreadMessages.set(chat.id, unreadCount);
-            console.log(`Chat ${chat.name}: ${unreadCount} unread messages`);
         });
         console.log(`Loaded ${chats.size} chats`);
     }
@@ -112,7 +110,6 @@ socket.on('initial_data', (data) => {
     }
     if (totalUnread > 0) {
         console.log(`📨 You have ${totalUnread} unread messages`);
-        // Можем показать всплывающее уведомление
         if (Notification.permission === 'granted') {
             new Notification(`Fembo`, {
                 body: `У вас ${totalUnread} непрочитанных сообщений`,
@@ -278,10 +275,10 @@ socket.on('chat_deleted', (chatId) => {
     if (currentChat && currentChat.id === chatId) {
         currentChat = null;
         const chatHeaderH3 = chatHeader.querySelector('h3');
-        if (chatHeaderH3) chatHeaderH3.textContent = 'Выберите чат';
+        if (chatHeaderH3) chatHeaderH3.textContent = 'SELECT CHAT';
         deleteChatBtn.style.display = 'none';
         messageInputContainer.style.display = 'none';
-        messagesContainer.innerHTML = '<div class="empty-chat-message"><p>Выберите чат для начала общения</p></div>';
+        messagesContainer.innerHTML = '<div class="empty-chat-message"><p>➤ ВЫБЕРИТЕ ЧАТ</p></div>';
     }
     renderChatsList();
 });
@@ -293,25 +290,20 @@ socket.on('new_message', (data) => {
     if (chat) {
         chat.messages.push(data.message);
         
-        // Если сообщение не от текущего пользователя и чат не открыт
         if (data.message.sender !== currentUser.nick && 
             (!currentChat || currentChat.id !== data.chatId)) {
             const currentCount = unreadMessages.get(data.chatId) || 0;
             unreadMessages.set(data.chatId, currentCount + 1);
             renderChatsList();
             playNotificationSound();
-            
-            // Обновляем заголовок страницы
             updatePageTitle();
         }
         
-        // Если чат открыт, показываем сообщение сразу и сбрасываем счетчик
         if (currentChat && currentChat.id === data.chatId) {
             renderMessages(chat);
             scrollToBottom();
             unreadMessages.set(data.chatId, 0);
             renderChatsList();
-            // Отправляем на сервер, что сообщения прочитаны
             socket.emit('mark_read', data.chatId);
         }
     }
@@ -320,7 +312,6 @@ socket.on('new_message', (data) => {
 function createPrivateChat(user) {
     if (!user || !user.id) return;
     
-    // Проверяем, существует ли уже личный чат
     let existingChat = null;
     for (let [chatId, chat] of chats) {
         if (chat.isPrivate && chat.participants && chat.participants.length === 2) {
@@ -378,7 +369,7 @@ function updateChatHeaderTitle(chat) {
                 }
             }
         }
-        chatHeaderH3.textContent = displayName;
+        chatHeaderH3.textContent = displayName.toUpperCase();
     }
 }
 
@@ -506,7 +497,6 @@ function openChat(chatId) {
         renderMessages(chat);
         scrollToBottom();
         
-        // Сбрасываем счетчик непрочитанных при открытии чата
         if (unreadMessages.get(chatId) > 0) {
             unreadMessages.set(chatId, 0);
             socket.emit('mark_read', chatId);
@@ -522,16 +512,26 @@ function openChat(chatId) {
 function renderMessages(chat) {
     if (!messagesContainer) return;
     messagesContainer.innerHTML = '';
+    
+    if (!chat.messages || chat.messages.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'empty-chat-message';
+        emptyDiv.innerHTML = '<p>➤ НЕТ СООБЩЕНИЙ</p><p>➤ НАПИШИТЕ ЧТО-НИБУДЬ</p>';
+        messagesContainer.appendChild(emptyDiv);
+        return;
+    }
+    
     chat.messages.forEach(msg => {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${msg.sender === currentUser.nick ? 'own' : 'other'}`;
         const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
         messageDiv.innerHTML = `
-            <div class="message-header">${escapeHtml(msg.sender)}</div>
+            <div class="message-header">${msg.sender === currentUser.nick ? '[ YOU ]' : `[ ${msg.sender.toUpperCase()} ]`}</div>
             <div class="message-content">${escapeHtml(msg.text)}</div>
             <div class="message-time">${time}</div>
         `;
+        
         messagesContainer.appendChild(messageDiv);
     });
 }
@@ -540,7 +540,7 @@ function addSystemMessage(text) {
     const messageDiv = document.createElement('div');
     messageDiv.className = 'message other';
     messageDiv.innerHTML = `
-        <div class="message-header">Система</div>
+        <div class="message-header">[ SYSTEM ]</div>
         <div class="message-content">${escapeHtml(text)}</div>
     `;
     messagesContainer.appendChild(messageDiv);
@@ -554,6 +554,7 @@ function scrollToBottom() {
 }
 
 function escapeHtml(text) {
+    if (!text) return '';
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
@@ -564,7 +565,7 @@ function updatePageTitle() {
     for (let count of unreadMessages.values()) {
         totalUnread += count;
     }
-    document.title = totalUnread > 0 ? `(${totalUnread}) Fembo` : 'Fembo 🦊';
+    document.title = totalUnread > 0 ? `(${totalUnread}) FEMBO` : 'FEMBO';
 }
 
 setInterval(updatePageTitle, 1000);
@@ -684,4 +685,4 @@ document.addEventListener('click', (e) => {
     }
 });
 
-console.log('🦊 Fembo Messenger ready');
+console.log('🦊 FEMBO Messenger ready');
