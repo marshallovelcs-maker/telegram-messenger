@@ -1,31 +1,33 @@
-/* ========== КИБЕРПАНК ТЕМА (по умолчанию) ========== */
+/* ========== КИБЕРПАНК ТЕМА (консольный стиль) ========== */
 :root {
-    /* Киберпанк тема */
-    --bg-primary: #03050b;
-    --bg-secondary: #0a0c15;
-    --bg-tertiary: #05070f;
-    --bg-hover: #0a0c1a;
-    --border-color: #00ffcc;
+    /* Киберпанк тема - консольный стиль */
+    --bg-primary: #0a0c0f;
+    --bg-secondary: #0f1115;
+    --bg-tertiary: #0c0e12;
+    --bg-hover: #1a1d24;
+    --border-color: #2a2f3a;
     --text-primary: #00ffcc;
     --text-secondary: #88aaff;
-    --text-muted: #5a7a7a;
+    --text-muted: #5a6e7a;
     --accent: #00ffcc;
-    --accent-hover: #00ccaa;
+    --accent-hover: #33ffdd;
     --danger: #ff3366;
-    --danger-hover: #ff6666;
-    --own-message-bg: #1a1a2a;
+    --danger-hover: #ff6680;
+    --own-message-bg: #1a1f2a;
     --own-message-border: #ff66cc;
     --own-message-text: #ffccff;
-    --other-message-bg: #0a0c15;
+    --other-message-bg: #0f1219;
     --other-message-border: #00ffcc;
     --other-message-text: #ccffcc;
     --online-indicator: #00ffcc;
     --offline-indicator: #ff3366;
     --unread-bg: #ff3366;
-    --shadow: rgba(0, 255, 204, 0.2);
+    --shadow: rgba(0, 255, 204, 0.15);
+    --font-mono: 'Courier New', 'SF Mono', 'Monaco', 'Fira Code', monospace;
+    --font-system: 'Courier New', 'SF Mono', monospace;
 }
 
-/* ========== ТЕМНАЯ GITHUB ТЕМА (Dark GitHub) ========== */
+/* ========== ТЕМНАЯ GITHUB ТЕМА (современный стиль) ========== */
 body.dark-github-theme {
     --bg-primary: #0d1117;
     --bg-secondary: #161b22;
@@ -49,6 +51,8 @@ body.dark-github-theme {
     --offline-indicator: #6e7681;
     --unread-bg: #2f81f7;
     --shadow: rgba(0, 0, 0, 0.3);
+    --font-mono: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+    --font-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
 }
 
 * {
@@ -58,11 +62,104 @@ body.dark-github-theme {
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+    font-family: var(--font-system);
     background: var(--bg-primary);
     color: var(--text-primary);
     overflow: hidden;
     transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Киберпанк тема - консольный стиль для элементов */
+body:not(.dark-github-theme) .sidebar-header h2,
+body:not(.dark-github-theme) .chat-header h3,
+body:not(.dark-github-theme) .message-header,
+body:not(.dark-github-theme) .message-content,
+body:not(.dark-github-theme) .user-item,
+body:not(.dark-github-theme) .chat-name,
+body:not(.dark-github-theme) .chat-preview,
+body:not(.dark-github-theme) .search-input,
+body:not(.dark-github-theme) #messageInput,
+body:not(.dark-github-theme) .modal-content input,
+body:not(.dark-github-theme) .edit-nick-btn,
+body:not(.dark-github-theme) .delete-chat-btn,
+body:not(.dark-github-theme) .new-chat-btn,
+body:not(.dark-github-theme) .theme-toggle {
+    font-family: var(--font-mono);
+}
+
+body:not(.dark-github-theme) .sidebar-header h2 {
+    letter-spacing: 2px;
+    text-shadow: 0 0 5px #00ffcc;
+}
+
+body:not(.dark-github-theme) .chat-header h3 {
+    letter-spacing: 1px;
+}
+
+body:not(.dark-github-theme) .message-header {
+    font-family: var(--font-mono);
+    letter-spacing: 1px;
+}
+
+body:not(.dark-github-theme) .message.own .message-header {
+    color: #ff66cc;
+}
+
+body:not(.dark-github-theme) .message.other .message-header {
+    color: #00ffcc;
+}
+
+body:not(.dark-github-theme) .message-content {
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+
+body:not(.dark-github-theme) .user-item {
+    font-family: var(--font-mono);
+}
+
+body:not(.dark-github-theme) .user-item.online::before {
+    content: ">";
+}
+
+body:not(.dark-github-theme) .user-item.offline::before {
+    content: "X";
+}
+
+body:not(.dark-github-theme) .chat-name {
+    font-family: var(--font-mono);
+    font-weight: normal;
+}
+
+body:not(.dark-github-theme) .chat-preview {
+    font-family: var(--font-mono);
+    opacity: 0.8;
+}
+
+body:not(.dark-github-theme) .search-input::placeholder,
+body:not(.dark-github-theme) #messageInput::placeholder {
+    font-family: var(--font-mono);
+    color: #3a5a5a;
+}
+
+body:not(.dark-github-theme) .edit-nick-btn,
+body:not(.dark-github-theme) .delete-chat-btn,
+body:not(.dark-github-theme) .new-chat-btn,
+body:not(.dark-github-theme) .theme-toggle {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 11px;
+}
+
+body:not(.dark-github-theme) .new-chat-btn {
+    font-size: 18px;
+}
+
+body:not(.dark-github-theme) .unread-count {
+    font-family: var(--font-mono);
+    background: #ff3366;
+    font-weight: bold;
 }
 
 /* Кнопка переключения темы - вверху справа, без скруглений */
@@ -76,7 +173,7 @@ body {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     cursor: pointer;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
     display: flex;
     align-items: center;
@@ -243,12 +340,18 @@ body {
 }
 
 .online-users h3, .offline-users h3 {
-    font-size: 12px;
+    font-size: 11px;
     text-transform: uppercase;
     color: var(--text-muted);
     margin-bottom: 10px;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
     font-weight: 600;
+}
+
+body:not(.dark-github-theme) .online-users h3,
+body:not(.dark-github-theme) .offline-users h3 {
+    font-family: var(--font-mono);
+    letter-spacing: 2px;
 }
 
 .users-list {
@@ -299,12 +402,17 @@ body {
 }
 
 .chats-list h3 {
-    font-size: 12px;
+    font-size: 11px;
     text-transform: uppercase;
     color: var(--text-muted);
     margin-bottom: 10px;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
     font-weight: 600;
+}
+
+body:not(.dark-github-theme) .chats-list h3 {
+    font-family: var(--font-mono);
+    letter-spacing: 2px;
 }
 
 .chats-container {
@@ -512,10 +620,13 @@ body {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
-    font-family: inherit;
     resize: none;
     font-size: 14px;
     border-radius: 0;
+}
+
+body:not(.dark-github-theme) #messageInput {
+    font-family: var(--font-mono);
 }
 
 #messageInput:focus {
@@ -531,10 +642,16 @@ body {
     color: white;
     cursor: pointer;
     transition: all 0.2s;
-    font-size: 14px;
+    font-size: 13px;
     height: 40px;
     font-weight: 500;
     border-radius: 0;
+}
+
+body:not(.dark-github-theme) #sendMessageBtn {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 #sendMessageBtn:hover {
