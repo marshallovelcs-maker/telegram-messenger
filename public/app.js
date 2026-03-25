@@ -76,25 +76,25 @@ if (userNick) {
 
 // Theme initialization
 const savedTheme = localStorage.getItem('fembo_theme');
-if (savedTheme === 'pastel') {
-    document.body.classList.add('pastel-theme');
+if (savedTheme === 'dark-github') {
+    document.body.classList.add('dark-github-theme');
     isCyberpunkTheme = false;
-    if (themeToggle) themeToggle.textContent = '🌙';
+    if (themeToggle) themeToggle.textContent = 'THEME';
 } else {
-    if (themeToggle) themeToggle.textContent = '🎨';
+    if (themeToggle) themeToggle.textContent = 'THEME';
 }
 
 // Theme toggle handler
 if (themeToggle) {
     themeToggle.onclick = () => {
         if (isCyberpunkTheme) {
-            document.body.classList.add('pastel-theme');
-            themeToggle.textContent = '🌙';
-            localStorage.setItem('fembo_theme', 'pastel');
+            document.body.classList.add('dark-github-theme');
+            themeToggle.textContent = 'THEME';
+            localStorage.setItem('fembo_theme', 'dark-github');
             isCyberpunkTheme = false;
         } else {
-            document.body.classList.remove('pastel-theme');
-            themeToggle.textContent = '🎨';
+            document.body.classList.remove('dark-github-theme');
+            themeToggle.textContent = 'THEME';
             localStorage.setItem('fembo_theme', 'cyberpunk');
             isCyberpunkTheme = true;
         }
