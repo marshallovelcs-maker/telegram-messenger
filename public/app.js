@@ -28,6 +28,7 @@ const messageInputContainer = document.querySelector('.message-input-container')
 const messageInput = document.getElementById('messageInput');
 const sendMessageBtn = document.getElementById('sendMessageBtn');
 const deleteChatBtn = document.getElementById('deleteChatBtn');
+const themeToggle = document.getElementById('themeToggle');
 
 // Modals
 const nickModal = document.getElementById('nickModal');
@@ -39,6 +40,9 @@ const chatNameInput = document.getElementById('chatNameInput');
 const participantsList = document.getElementById('participantsList');
 const createChatBtn = document.getElementById('createChatBtn');
 const cancelChatBtn = document.getElementById('cancelChatBtn');
+
+// Theme state
+let isCyberpunkTheme = true;
 
 // localStorage functions
 function saveUserNick(nick) {
@@ -68,6 +72,33 @@ if (!userNick) {
 
 if (userNick) {
     socket.emit('register', userNick);
+}
+
+// Theme initialization
+const savedTheme = localStorage.getItem('fembo_theme');
+if (savedTheme === 'pastel') {
+    document.body.classList.add('pastel-theme');
+    isCyberpunkTheme = false;
+    if (themeToggle) themeToggle.textContent = '🌙';
+} else {
+    if (themeToggle) themeToggle.textContent = '🎨';
+}
+
+// Theme toggle handler
+if (themeToggle) {
+    themeToggle.onclick = () => {
+        if (isCyberpunkTheme) {
+            document.body.classList.add('pastel-theme');
+            themeToggle.textContent = '🌙';
+            localStorage.setItem('fembo_theme', 'pastel');
+            isCyberpunkTheme = false;
+        } else {
+            document.body.classList.remove('pastel-theme');
+            themeToggle.textContent = '🎨';
+            localStorage.setItem('fembo_theme', 'cyberpunk');
+            isCyberpunkTheme = true;
+        }
+    };
 }
 
 // Socket event handlers
@@ -275,10 +306,10 @@ socket.on('chat_deleted', (chatId) => {
     if (currentChat && currentChat.id === chatId) {
         currentChat = null;
         const chatHeaderH3 = chatHeader.querySelector('h3');
-        if (chatHeaderH3) chatHeaderH3.textContent = 'SELECT CHAT';
+        if (chatHeaderH3) chatHeaderH3.textContent = 'ВЫБЕРИТЕ ЧАТ';
         deleteChatBtn.style.display = 'none';
         messageInputContainer.style.display = 'none';
-        messagesContainer.innerHTML = '<div class="empty-chat-message"><p>➤ ВЫБЕРИТЕ ЧАТ</p></div>';
+        messagesContainer.innerHTML = '<div class="empty-chat-message"><p>🦊 ВЫБЕРИТЕ ЧАТ</p></div>';
     }
     renderChatsList();
 });
@@ -522,7 +553,7 @@ function renderMessages(chat) {
     if (!chat.messages || chat.messages.length === 0) {
         const emptyDiv = document.createElement('div');
         emptyDiv.className = 'empty-chat-message';
-        emptyDiv.innerHTML = '<p>➤ НЕТ СООБЩЕНИЙ</p><p>➤ НАПИШИТЕ ЧТО-НИБУДЬ</p>';
+        emptyDiv.innerHTML = '<p>🦊 НЕТ СООБЩЕНИЙ</p><p>НАПИШИТЕ ЧТО-НИБУДЬ</p>';
         messagesContainer.appendChild(emptyDiv);
         return;
     }
